@@ -35,7 +35,7 @@ using namespace std;
 //allocate memory Carl
 
 //ELU Function
-//d/dx ELU Carl
+//d/dx ELU 
 
 //perceptron Carl
 
