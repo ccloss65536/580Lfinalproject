@@ -25,9 +25,9 @@ class NeuralNetwork{
 
 //input layer to hidden layer Carl
 
-//input hidden later to output layer Carl
+//input hidden layer(s) to output layer Carl
 
-//Output layer
+//Output layer Carl
 
 //Image
 
