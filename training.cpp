@@ -11,13 +11,17 @@ using namespace std;
 
 //num training samples
 
-//Image size dimensions(width,heigh)
+//Image size dimensi`ons(width,heigh)
 
 //num input neurons
+int num_input_neurons;
 //num hidden neurons
+int num_hidden_neurons;
 //num output neurons
+int num_output_neurons;
 //epochs?
 //learning rate
+double learning_rate;
 //momentum
 //epsilon
 
@@ -46,8 +50,13 @@ double dELU(double x) {
 		return 1;
 	else
 		return ELU(x) + learningRate;
-//perceptron
-
+//perceptron Kevin Yan
+void perceptron() {
+	//set hidden nodes to 0
+	for(int i = 0; i <= num_input_nodes; i++) {
+		hidden_nodes = 0;
+	}
+}
 //Back Propogation Algo
 
 //Learning
