@@ -3,16 +3,17 @@
 #include <string>
 #include <algorithm>
 #include <thread>
+#include <Eigen/Dense> 
 
 using namespace std;
-
+class NeuralNetwork{
 //take training image file name
 
 //take training labels
 
 //num training samples
 
-//Image size dimensions(width,heigh)
+
 
 //num input neurons
 //num hidden neurons
@@ -37,7 +38,7 @@ using namespace std;
 //ELU Function
 //d/dx ELU 
 
-//perceptron Carl
+//perceptron
 
 //Back Propogation Algo Carl
 
@@ -46,5 +47,5 @@ using namespace std;
 //Reading input
 
 //save weights
-
+};
 //main
