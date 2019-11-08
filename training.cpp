@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <algorithm>
+#include <thread>
 
 using namespace std;
 
@@ -21,9 +22,9 @@ using namespace std;
 //momentum
 //epsilon
 
-//input layer to hidden layer
+//input layer to hidden layer Carl
 
-//input hidden later to output layer
+//input hidden later to output layer Carl
 
 //Output layer
 
@@ -31,15 +32,16 @@ using namespace std;
 
 //filestream to read data
 
-//allocate memorry
+//allocate memory Carl
 
 //ELU Function
+//d/dx ELU Carl
 
-//perceptron
+//perceptron Carl
 
-//Back Propogation Algo
+//Back Propogation Algo Carl
 
-//Learning
+//Learning Carl
 
 //Reading input
 
