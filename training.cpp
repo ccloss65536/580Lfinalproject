@@ -33,8 +33,19 @@ using namespace std;
 
 //allocate memorry
 
-//ELU Function
-
+//ELU Function Kevin Yan
+double ELU(double x) {
+	if(x > 0) 
+		return x;
+	else 
+		return learningRate*(exp(x)-1);
+}
+//ELU derivative Function Kevin Yan
+double dELU(double x) {
+	if(x > 0)
+		return 1;
+	else
+		return ELU(x) + learningRate;
 //perceptron
 
 //Back Propogation Algo
