@@ -3,10 +3,13 @@
 #include <string>
 #include <algorithm>
 #include <thread>
+#include <mutex>
 #include <Eigen/Dense> 
 
 using namespace std;
 using namespace Eigen;
+
+
 class NeuralNetwork{
 	//take training image file name
 
@@ -25,10 +28,14 @@ class NeuralNetwork{
 	//learning rate
 	double learning_rate;
 	vector<MatrixXd> layers;
+	mutex loss_sum_lock, producer, consumer, file; //Do these need to be pointers to mutexes? probably not
+	vector<pair<VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
+	unsigned int pro_buffer_index, con_buffer_index, buffer_size;
+	 
+	 
+
 
 	//epochs?
-	//learning rate Carl
-	//momentum??
 	//epsilon Carl
 
 	//input layer to hidden layer Carl
@@ -41,7 +48,30 @@ class NeuralNetwork{
 
 	//filestream to read data
 
-	//allocate memory Carl
+	//allocate memory 
+	pair<VectorXd> generate_training_example(istream& file){
+		//make sure to grab and ungrab the file mutex as necessary 
+	}
+	
+	void producer_thread(istream& file, /*Might have to rearrange or add args, idk*/){
+		pair<VectorXd> example = generate_training_example(file);
+		lock_guard<mutex>(producer); //take the mutex until the lock_guard leaves scope
+		vecs_to_calc[pro_buffer_index] = example;
+		buffer_index = (pro_buffer_index + 1) % buffer_size;
+	}
+
+	void consumer_thread(/*maybe a reference to the sum?*/){
+		auto l = unique_lock<mutex>(consumer);
+		pair<VectorXd> example = vecs_to_calc[con_buffer_index]
+		con_buffer_index = (con_buffer_index + 1) % buffer_size;
+		l.unlock();
+		double loss = loss(example.first, example.second);
+		//...
+	
+
+	}
+
+
 
 	//ELU Function Kevin Yan
 	double ELU(double x) {
@@ -62,19 +92,30 @@ class NeuralNetwork{
 	//perceptron 
 	
 	//This returns the loss for a single example, preconverted into a vector
-	double loss(const& VectorXf input_vector, const& Vector reference_vec){
+	double loss(const VectorXd& input_vector, const VectorXd& reference_vec){
 		VectorXd temp = input_vector;
 		for(MatrixXd l : layers){
 			temp = l * temp;
 			for(int i = 0; i < temp.size(); i++){
 				temp[i] = ELU(temp[i]);
 			}
-		return (reference_vec - temp).dot(reference_vec - temp);
+		return (reference_vec - temp).dot(reference_vec - temp); //feel free to change this to something faster
 	}
 
 
 	//Learning Carl
-	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate.
+	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate (I am unclaimimng this part).
+
+	void train(const& string filename){
+		//open file here
+		double loss = 0;
+
+	}
+		
+
+
+
+
 
 	//Reading input
 
