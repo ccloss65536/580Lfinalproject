@@ -30,7 +30,7 @@ class NeuralNetwork{
 	vector<MatrixXd> layers;
 	mutex loss_sum_lock, producer, consumer, file; //Do these need to be pointers to mutexes? probably not
 	vector<pair<VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
-	unsigned int pro_buffer_index, con_buffer_index, buffer_size;
+	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total;
 	 
 	 
 
@@ -50,25 +50,32 @@ class NeuralNetwork{
 
 	//allocate memory 
 	pair<VectorXd> generate_training_example(istream& file){
-		//make sure to grab and ungrab the file mutex as necessary 
+		//make sure to grab and ungrab the file mutex as necessary to avoid corruption 
 	}
 	
-	void producer_thread(istream& file, /*Might have to rearrange or add args, idk*/){
-		pair<VectorXd> example = generate_training_example(file);
-		lock_guard<mutex>(producer); //take the mutex until the lock_guard leaves scope
-		vecs_to_calc[pro_buffer_index] = example;
-		buffer_index = (pro_buffer_index + 1) % buffer_size;
+	void producer_thread(istream& file, unsigned int training_size){
+		while(file){
+			pair<VectorXd> example = generate_training_example(file);
+			auto l = lock_guard<mutex>(producer); //take the mutex until the lock_guard leaves scope
+			vecs_to_calc[pro_buffer_index] = example;
+			buffer_index = (pro_buffer_index + 1) % buffer_size;
+		}
 	}
 
-	void consumer_thread(/*maybe a reference to the sum?*/){
-		auto l = unique_lock<mutex>(consumer);
-		pair<VectorXd> example = vecs_to_calc[con_buffer_index]
-		con_buffer_index = (con_buffer_index + 1) % buffer_size;
-		l.unlock();
-		double loss = loss(example.first, example.second);
-		//...
-	
-
+	void consumer_thread(double& total_loss, unsigned int training_size){
+		while(training_total < training_size){
+			auto l = unique_lock<mutex>(consumer);
+			l.lock();
+			training_total++;
+			pair<VectorXd> example = vecs_to_calc[con_buffer_index]
+			con_buffer_index = (con_buffer_index + 1) % buffer_size;
+			l.unlock();
+			double loss = loss(example.first, example.second);
+			l = unique_lock(loss_sum_lock);
+			l.lock();
+			total_loss += loss;
+			l.unlock();	
+		}
 	}
 
 
