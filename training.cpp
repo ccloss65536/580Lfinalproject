@@ -116,6 +116,11 @@ class NeuralNetwork{
 	void train(const& string filename){
 		//open file here
 		double loss = 0;
+		ifstream f(filename);
+		vector<thread> threads;
+		//loop to initialize threads with either producer args or consumer args
+		//joins
+		//backpropagate
 
 	}
 		
