@@ -4,13 +4,17 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
+#include <random>
 #include <Eigen/Dense> 
+#include <cmath>
 
 using namespace std;
 using namespace Eigen;
 
 
 class NeuralNetwork{
+public:
 	//take training image file name
 
 	//take training labels
@@ -29,11 +33,20 @@ class NeuralNetwork{
 	double learning_rate;
 	vector<MatrixXd> layers;
 	mutex loss_sum_lock, producer, consumer, file; //Do these need to be pointers to mutexes? probably not
+	condition_variable full, empty;
 	vector<pair<VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
-	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total;
-	 
-	 
+	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total, buffer_taken;
+	unsigned int num_producers, num_consumers;
+	
+	NeuralNetwork(double learning_rate, num_layers/*...*/){
+		this->learning_rate = learning_rate;
+		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
+		//initalize vector buffer
 
+		//TODO: finish this
+
+	}
+		
 
 	//epochs?
 	//epsilon Carl
@@ -54,25 +67,38 @@ class NeuralNetwork{
 	}
 	
 	void producer_thread(istream& file, unsigned int training_size){
-		while(file){
+		while(file && pro_training_total < training_size){
 			pair<VectorXd> example = generate_training_example(file);
-			auto l = lock_guard<mutex>(producer); //take the mutex until the lock_guard leaves scope
+			auto l = unique_lock(producer);
+			while(buffer_taken >= buffer_size) full.wait(l);
 			vecs_to_calc[pro_buffer_index] = example;
-			buffer_index = (pro_buffer_index + 1) % buffer_size;
+			pro_buffer_index = (pro_buffer_index + 1) % buffer_size;
+			buffer_taken++;
+			empty.notify_one();
+			pro_training_total++;
+			producer.unlock();
 		}
 	}
 
 	void consumer_thread(double& total_loss, unsigned int training_size){
 		while(training_total < training_size){
-			auto l = unique_lock<mutex>(consumer);
-			l.lock();
+			auto l = unique_lock(consumer); //lock is taken as soon as this object is constructed
+			while(buffer_taken <= 0){
+				if(file_ended){
+					l.unlock();
+					return;
+				}
+				empty.wait(l);
+			}
+
 			training_total++;
 			pair<VectorXd> example = vecs_to_calc[con_buffer_index]
 			con_buffer_index = (con_buffer_index + 1) % buffer_size;
+			buffer_taken--;
+			full.notify_one();
 			l.unlock();
 			double loss = loss(example.first, example.second);
 			l = unique_lock(loss_sum_lock);
-			l.lock();
 			total_loss += loss;
 			l.unlock();	
 		}
@@ -85,14 +111,14 @@ class NeuralNetwork{
 		if(x > 0) 
 			return x;
 		else 
-			return learningRate*(exp(x)-1);
+			return learning_rate*(exp(x)-1);
 	}
 	//ELU derivative Function Kevin Yan
 	double dELU(double x) {
 		if(x > 0)
 			return 1;
 		else
-			return ELU(x) + learningRate;
+			return ELU(x) + learning_rate;
 	}
 	 
 
@@ -110,16 +136,24 @@ class NeuralNetwork{
 	}
 
 
-	//Learning Carl
+	//Learning
 	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate (I am unclaimimng this part).
 
-	void train(const& string filename){
-		//open file here
+	void train(const& string filename, unsigned int training_size){
 		double loss = 0;
 		ifstream f(filename);
 		vector<thread> threads;
-		//loop to initialize threads with either producer args or consumer args
-		//joins
+		for(unsigned int i = 0; i < num_producers; i++){
+			threads.push_back(thread(producer_thread, this, f, training_size));
+		}
+		for(unsigned int i = 0; i < num_consumers; i++){
+			threads.push_back(thread(consumer_thread, this, loss, training_size));
+		}
+		for(thread& t : threads){
+			t.join();
+		}
+		
+		
 		//backpropagate
 
 	}
