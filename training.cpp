@@ -9,52 +9,6 @@
 #include <cmath>
 
 using namespace std;
-
-//take training image file name
-
-//take training labels
-
-//num training samples
-
-//Image size dimensi`ons(width,heigh)
-
-//num input neurons
-int num_input_neurons;
-//num hidden neurons
-int num_hidden_neurons;
-//num output neurons
-int num_output_neurons;
-//epochs?
-//learning rate
-double learning_rate;
-//momentum
-//epsilon
-
-//input layer to hidden layer
-
-//input hidden later to output layer
-
-//Output layer
-
-//Image
-
-//filestream to read data
-
-//allocate memorry
-
-//ELU Function Kevin Yan
-
-//ELU derivative Function Kevin Yan
-
-//Back Propogation Algo
-
-//Learning
-
-//Reading input
-
-//save weights
-
-
 using namespace Eigen;
 
 
@@ -107,7 +61,7 @@ public:
 	vector<MatrixXd> layers;
 	mutex loss_sum_lock, producer, consumer, generate;
 	condition_variable full, empty;
-	vector<pair<VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
+	vector<pair<VectorXd,VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
 	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total, buffer_taken;
 	unsigned int num_producers, num_consumers;
 	
@@ -136,19 +90,28 @@ public:
 
 	//Image
 
-	pair<VectorXd> generate_training_example(istream& images, istream& labels){
+	pair<VectorXd,VectorXd> generate_training_example(istream& images, istream& labels){
 		//TODO: finish this
 		char buff[IMAGE_SIZE];
+		char label;
 		auto l = unique_lock(generate);
 		images.read(buff, IMAGE_SIZE);
+		labels.read(&label, 1)
 		l.unlock();
-		VectorXd target();
+		VectorXd image(IMAGE_SIZE);
+		for(int i = 0; i < IMAGE_SIZE; i++){
+			image[i] = buff[i];
+		}
+		VectorXd target = VectorXd::Zero(num_output_neurons);
+		target[label] = 1;
+		return pair<VectorXd,VectorXd>(image,target);
+
 
 	}
 	
 	void producer_thread(istream& images, istream& labels, unsigned int training_size){
 		while(images && pro_training_total < training_size){
-			pair<VectorXd> example = generate_training_example(file);
+			pair<VectorXd,VectorXd> example = generate_training_example(file);
 			auto l = unique_lock(producer);
 			while(buffer_taken >= buffer_size) full.wait(l);
 			vecs_to_calc[pro_buffer_index] = example;
@@ -168,7 +131,7 @@ public:
 			}
 
 			training_total++;
-			pair<VectorXd> example = vecs_to_calc[con_buffer_index]
+			pair<VectorXd,VectorXd> example = vecs_to_calc[con_buffer_index]
 			con_buffer_index = (con_buffer_index + 1) % buffer_size;
 			buffer_taken--;
 			full.notify_one();
@@ -184,24 +147,22 @@ public:
 
 	//ELU Function Kevin Yan
 	double ELU(double x) {
-	if(x > 0) 
-		return x;
-	else 
-		return learningRate*(exp(x)-1);
-  }
-  //ELU derivative Function Kevin Yan
-  double dELU(double x) {
-    if(x > 0)
-      return 1;
-    else
-      return ELU(x) + learningRate;
-  //perceptron Kevin Yan
-  void perceptron() {
-    //set hidden nodes to 0
-    for(int i = 0; i <= num_input_nodes; i++) {
-      hidden_nodes = 0;
-    }
-  }
+		if(x > 0) 
+			return x;
+		else 
+			return learning_rate*(exp(x)-1);
+	}
+	//ELU derivative Function Kevin Yan
+	double dELU(double x) {
+		if(x > 0)
+			return 1;
+		else
+			return ELU(x) + learning_rate;
+	}
+	 
+
+	//perceptron 
+	
 	//This returns the loss for a single example, preconverted into a vector
 	//Always pass Eigen matrices & vectors by reference!
 	double loss(const VectorXd& input_vector, const VectorXd& reference_vec){
@@ -228,15 +189,23 @@ public:
 			int magic = read_int(magic_buff, 4);
 
 			if(magic != 2051){
-				cerr << "Bad image data! " << magic << endl;
+				cerr << "Bad image data! Magic: " << magic << endl;
 				exit(magic);
 			}
 			labels.read(magic_buff, 4);
 			magic = read_int(magic_buff, 4);
 			if(magic != 2049){
-				cerr << "Bad label data! " << magic << endl;
+				cerr << "Bad label data! Magic:" << magic << endl;
 				exit(magic);
 			}
+
+			char num_examples_buff[4] = {0,0,0,0};
+			labels.read(num_examples_buff, 4);
+			int training_size = read_int(num_examples_buff, 4);
+			
+			images.seek(ios_base::cur, 4*3); //skip over the number of examples, row size, and column size in the image data
+			
+
 
 			//TODO: read out dimensions and training size
 
