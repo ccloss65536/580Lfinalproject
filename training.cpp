@@ -80,6 +80,11 @@ public:
 			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, hidden_layer_size + 1));
 		}
 		layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons));
+
+		for(MatrixXd& l : layers){
+			l(0,0) = 1;
+			//decide on column-major or row-major tomorrow
+		}
 		this->epochs = epochs;
 
 				
@@ -98,12 +103,14 @@ public:
 		images.read(buff, IMAGE_SIZE);
 		labels.read(&label, 1)
 		l.unlock();
-		VectorXd image(IMAGE_SIZE);
-		for(int i = 0; i < IMAGE_SIZE; i++){
+		VectorXd image(IMAGE_SIZE + 1);
+		image[0] = 1;
+		for(int i = 1; i < IMAGE_SIZE + 1; i++){
 			image[i] = buff[i];
 		}
-		VectorXd target = VectorXd::Zero(num_output_neurons);
-		target[label] = 1;
+		VectorXd target = VectorXd::Zero(num_output_neurons + 1);
+		target[label + 1] = 1;
+		target[0] = 1; //bias
 		return pair<VectorXd,VectorXd>(image,target);
 
 
@@ -186,14 +193,14 @@ public:
 			ifstream labels(label_file);
 			char magic_buff[4];
 			images.read(magic, 4);
-			int magic = read_int(magic_buff, 4);
+			int magic = read_num(magic_buff, 4);
 
 			if(magic != 2051){
 				cerr << "Bad image data! Magic: " << magic << endl;
 				exit(magic);
 			}
 			labels.read(magic_buff, 4);
-			magic = read_int(magic_buff, 4);
+			magic = read_num(magic_buff, 4);
 			if(magic != 2049){
 				cerr << "Bad label data! Magic:" << magic << endl;
 				exit(magic);
@@ -201,7 +208,7 @@ public:
 
 			char num_examples_buff[4] = {0,0,0,0};
 			labels.read(num_examples_buff, 4);
-			int training_size = read_int(num_examples_buff, 4);
+			int training_size = read_num(num_examples_buff, 4);
 			
 			images.seek(ios_base::cur, 4*3); //skip over the number of examples, row size, and column size in the image data
 			
