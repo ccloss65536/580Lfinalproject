@@ -179,12 +179,12 @@ public:
 			for(int i = 0; i < temp.size(); i++){
 				temp[i] = ELU(temp[i]);
 			}
-		return (reference_vec - temp).dot(reference_vec - temp); //feel free to change this to something faster
+		return pow( (reference_vec - temp).sum(), 2); //feel free to change this to something faster
 	}
 
 
 	//Learning
-	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate (I am unclaimimng this part).
+	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate.
 
 	void train(const& string image_file, const string& label_file){
 		for(int i = 0; i < epochs; i++){
@@ -229,7 +229,7 @@ public:
 			} 
 		
 		
-			//backpropagate
+			//backpropagate Carl Closs
 
 			f.close();
 		}
