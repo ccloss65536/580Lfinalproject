@@ -5,18 +5,10 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-#include <Eigen/Dense> 
+#include <Eigen/Dense>
 #include <cmath>
 
 using namespace std;
-
-//take training image file name
-
-//take training labels
-
-//num training samples
-
-//Image size dimensi`ons(width,heigh)
 
 //num input neurons
 int num_input_neurons;
@@ -27,38 +19,15 @@ int num_output_neurons;
 //epochs?
 //learning rate
 double learning_rate;
-//momentum
-//epsilon
-
-//input layer to hidden layer
-
-//input hidden later to output layer
-
-//Output layer
-
-//Image
-
-//filestream to read data
-
-//allocate memorry
-
-//ELU Function Kevin Yan
-
-//ELU derivative Function Kevin Yan
-
-//Back Propogation Algo
-
-//Learning
-
-//Reading input
-
-//save weights
 
 
 using namespace Eigen;
 
 
-
+const string training_images_filename = "train-images-idx3-ubyte";
+const string training_labels_filename = "train-labels-idx1-ubyte";
+const string testing_images_filename = "t10k-images-idx3-ubyte";
+const string testing_labels_filenames = "t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28
 const int IMAGE_COLS = 28
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
@@ -94,7 +63,7 @@ public:
 
 	//num training samples
 
-
+	//num hidden layers
 
 	int num_input_neurons;
 	//num hidden neurons
@@ -110,7 +79,7 @@ public:
 	vector<pair<VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
 	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total, buffer_taken;
 	unsigned int num_producers, num_consumers;
-	
+
 	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, int buffer_size){
 		num_input_neurons = IMAGE_SIZE;
 		num_output_neurons = 10;
@@ -119,7 +88,7 @@ public:
 		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
 		vecs_to_calc = vector(buffer_size);
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
-		   first element of each set of inputs
+		   first element of each set of inputsoutput
 		*/
 		layers.emplace(layers.end(), MatrixXd::Random(num_input_neurons + 1, hidden_layer_size + 1));
 		for(int i = 0; i  < num_layers - 2; i++){
@@ -128,7 +97,7 @@ public:
 		layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons));
 		this->epochs = epochs;
 
-				
+
 
 		//TODO: finish this
 
@@ -145,7 +114,7 @@ public:
 		VectorXd target();
 
 	}
-	
+
 	void producer_thread(istream& images, istream& labels, unsigned int training_size){
 		while(images && pro_training_total < training_size){
 			pair<VectorXd> example = generate_training_example(file);
@@ -176,7 +145,7 @@ public:
 			double loss = loss(example.first, example.second);
 			l = unique_lock(loss_sum_lock);
 			total_loss += loss;
-			l.unlock();	
+			l.unlock();
 		}
 	}
 
@@ -184,9 +153,9 @@ public:
 
 	//ELU Function Kevin Yan
 	double ELU(double x) {
-	if(x > 0) 
+	if(x > 0)
 		return x;
-	else 
+	else
 		return learningRate*(exp(x)-1);
   }
   //ELU derivative Function Kevin Yan
@@ -240,7 +209,7 @@ public:
 
 			//TODO: read out dimensions and training size
 
-			
+
 			vector<thread> threads;
 			for(unsigned int i = 0; i < num_producers; i++){
 				threads.push_back(thread(producer_thread, this, i, training_size));
@@ -250,17 +219,71 @@ public:
 			}
 			for(thread& t : threads){
 				t.join();
-			} 
-		
-		
+			}
+
+
 			//backpropagate
 
 			f.close();
 		}
-		
+
 
 	}
-		
+	//method to test (Kevin Yan)
+	void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
+		ifstream testing_images;
+		ifstream testing_labels;
+		int image_magic_num;
+		int label_magic_num;
+		int num_images;
+		int num_labels;
+		int num_rows;
+		int num_cols;
+		char buffer;
+		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
+		//read binary image and label files
+		testing_images.open(testing_images_filename,ios::binary);
+		testing_labels.open(testing_labels_filename,ios::binary);
+		//read in image headers
+		testing_images.read((char*)&image_magic_num,sizeof(image_magic_num));
+		testing_images.read((char*)&num_images,sizeof(num_images));
+		testing_images.read((char*)&num_rows,sizeof(num_rows));
+		testing_images.read((char*)&num_cols,sizeof(num_cols));
+
+		//read in label headers
+		testing_labels.read((char*)&label_magic_num,sizeof(label_magic_num));
+		testing_labels.read((char*)&num_labels,sizeof(num_labels));
+
+		//check magic numbers
+		if(image_magic_num != 2051) {
+			cerr << "Bad Image Data! " << image_magic_num << endl;
+			exit(image_magic_num);
+		}
+		if(label_magic_num != 2049){
+			cerr << "Bad label data! " << magic << endl;
+			exit(label_magic_num);
+		}
+
+		//read image data
+		//grayscale
+		for(int i = 0; i < IMAGE_ROWS; i++) {
+			for(int j = 0; j < IMAGE_COLS; j++) {
+				testing_images.read(&buffer, sizeof(char));
+				buffer == 0 ? image_matrix[i][j] = 0 : image_matrix[i][j] = 1;
+			}
+		}
+
+		int predction = 0;
+		for(int i = 1; i < num_output_neurons; i++) {
+			if(SUBWITHOUTPUT[i] > SUBWITHOUTPUT[prediction]) {
+				prediction = i;
+			}
+		}
+
+
+
+	}
+
 
 
 
