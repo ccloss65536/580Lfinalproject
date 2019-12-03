@@ -243,12 +243,23 @@ public:
 			} 
 			
 			final_layer = layers.back();
-			RowVectorXd d_diffs(;
+			RowVectorXd d_diffs(final_layer.cols());
 			for(int j = 0; j < final_layer.cols(); j++) d_diffs[j] = dELU(diffs[j]);
 			RowVectorXd sigma_v = (diffs.array() * d_diffs.array() * sum_last_inputs.array()).matrix() //array allows for simple component-wise ops
-			RowVectorXd sigma_v_next;
-			for(unsigned int i = layers.size() - 1; i >= 0; i--){
+
+			for(unsigned int i = layers.size() - 2; i >= 0; i--){
 				//find next sigma vector, then add learning * sigma * layer_sum to each col
+				RowVectorXd sigma_v_next(layers[i - 1].cols());
+				for(int j = 0; j<  sigma_v_next.cols(); j++){
+					sigma_v_next[j] = layers[i].row(j).dot(sigma_v) * dELU(layer_sums[i][j]);
+				}
+				for(int j = 1; j < layers[i + 1].cols();j++){
+					layers[i + 1].col(j) += learning_rate * (sigma_v.array() * layer_sums[i+1].array()).matrix();
+				}
+				sigma_v = sigma_v_next;
+			}
+
+
 			}
 			
 			f.close();
@@ -256,13 +267,6 @@ public:
 		
 
 	}
-		
-
-
-
-
-
-	//Reading input Carl
 
 	//save weights
 };
