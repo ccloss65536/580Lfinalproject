@@ -14,7 +14,10 @@ using namespace std;
 using namespace Eigen;
 
 
-
+const string training_images_filename = "train-images-idx3-ubyte";
+const string training_labels_filename = "train-labels-idx1-ubyte";
+const string testing_images_filename = "t10k-images-idx3-ubyte";
+const string testing_labels_filenames = "t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
 const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
@@ -88,12 +91,16 @@ public:
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
 		   first element of each set of inputs
 		*/
-		layers.emplace(layers.end(), MatrixXd::Random(num_input_neurons + 1, hidden_layer_size + 1));
-		for(int i = 0; i  < num_layers - 2; i++){
-			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, hidden_layer_size + 1));
+		if(num_layers == 2){
+			layers.emplace_back(MatrixXd::Random(num_input_neurons + 1, num_output_neurons + 1)
 		}
-		layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
-
+		else{
+			layers.emplace(layers.end(), MatrixXd::Random(num_input_neurons + 1, hidden_layer_size + 1));
+			for(int i = 0; i  < num_layers - 2; i++){
+				layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, hidden_layer_size + 1));
+			}
+			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
+		}
 		for(MatrixXd& l : layers){
 			l(0,0) = 1;
 			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
@@ -279,4 +286,16 @@ public:
 
 	//save weights
 };
-//main Carl
+
+
+int main(int argc, char** argv){
+	double learning_rate = (argc < 2)? .1 : stod(string(argv[1]));
+	int num_layers = (argc < 3)? 3: stoi(argv[2]);
+	int epochs = (argc < 4)? 10: stoi(argv[3]);
+	int hidden_layer_size = (argc < 5)? 10: stoi(argv[4]);
+	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
+	NeuralNetork net(learning_rate, num_layers, epochs, hidden_layer_size, buffer_size);
+	net.train(training_images_filename, training_labels_filename);
+	net.testing(testing_images_filename, testing_labels_filenames); //the nn param is presumably goimg to be removed
+
+}
