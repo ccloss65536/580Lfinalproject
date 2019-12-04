@@ -92,7 +92,7 @@ public:
 		   first element of each set of inputs
 		*/
 		if(num_layers == 2){
-			layers.emplace_back(MatrixXd::Random(num_input_neurons + 1, num_output_neurons + 1)
+			layers.emplace_back(MatrixXd::Random(num_input_neurons + 1, num_output_neurons + 1));
 		}
 		else{
 			layers.emplace(layers.end(), MatrixXd::Random(num_input_neurons + 1, hidden_layer_size + 1));
@@ -274,8 +274,6 @@ public:
 				}
 				sigma_v = sigma_v_next;
 			}
-
-
 			
 			images.close();
 			labels.close();
@@ -284,7 +282,7 @@ public:
 
 	}
 
-	//save weights
+	//save weights Carl?
 };
 
 
@@ -294,8 +292,8 @@ int main(int argc, char** argv){
 	int epochs = (argc < 4)? 10: stoi(argv[3]);
 	int hidden_layer_size = (argc < 5)? 10: stoi(argv[4]);
 	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
-	NeuralNetork net(learning_rate, num_layers, epochs, hidden_layer_size, buffer_size);
+	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size, buffer_size);
 	net.train(training_images_filename, training_labels_filename);
-	net.testing(testing_images_filename, testing_labels_filenames); //the nn param is presumably goimg to be removed
+	//net.testing(testing_images_filename, testing_labels_filenames); //the nn param is presumably goimg to be removed
 
 }
