@@ -14,10 +14,10 @@ using namespace std;
 using namespace Eigen;
 
 
-const string training_images_filename = "train-images-idx3-ubyte";
-const string training_labels_filename = "train-labels-idx1-ubyte";
-const string testing_images_filename = "t10k-images-idx3-ubyte";
-const string testing_labels_filenames = "t10k-labels-idx1-ubyte";
+const string training_images_filename = "mnist/train-images-idx3-ubyte";
+const string training_labels_filename = "mnist/train-labels-idx1-ubyte";
+const string testing_images_filename = "mnist/t10k-images-idx3-ubyte";
+const string testing_labels_filenames = "mnist/t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
 const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
@@ -26,7 +26,7 @@ const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels i
 //WHYYY are MNIST numbers in big endian
 //refactored to not require an external buffer, since that is annoying
 //Use this to read in the 4-byte numbers from MNIST files or the numbers may be backwards!!!
-int read_num(istream& in, size_t size){
+int read_num(istream& in, int size){
 	if(size > 8 || size <= 0) {
 		cerr << "Bad size for number!";
 		exit(67);
@@ -36,13 +36,13 @@ int read_num(istream& in, size_t size){
 	int out = 5;
 	uint8_t* test_p = (uint8_t*)&out;
 	if(*test_p){ //system is little endian, make sure to reverse the number
-		for(size_t i = size - 1; i <= 0; i--){
+		for(int i = size - 1; i >= 0; i--){
 			*test_p = *(buff + i);
 			test_p++;
 		}
 	}
 	else{
-		for(size_t i = 0; i < size; i++){
+		for(int i = 0; i < size; i++){
 			*test_p = *(buff + i);
 			test_p++;
 		}
@@ -172,7 +172,7 @@ public:
 			l = unique_lock<mutex>(loss_sum_lock);
 			total_loss += loss_ex;
 			diffs += example.second - example.first;
-			l.unlock();	
+			l.unlock();	https://mycourses.binghamton.edu/webapps/assignment/uploadAssignment?content_id=_964569_1&course_id=_211651_1&group_id=&mode=view
 		}
 	}
 
@@ -244,7 +244,7 @@ public:
 			images.seekg(4*3, ios_base::cur); //skip over the number of examples, row size, and column size in the image data
 
 			vector<thread> threads;
-			for(unsigned int i = 0; i < num_producers; i++){
+			for(unsigned int i = 0; i < num_producers; i++){ //valgrind complains about here TODO: fix that
 				threads.push_back(thread(&NeuralNetwork::producer_thread, this, ref(images), ref(labels), training_size)); 
 				/*reference args to a thread function must be wrapped in std::ref for the compiler to understand
 				 * that a reference and not a value argument is intended
