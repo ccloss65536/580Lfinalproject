@@ -14,10 +14,10 @@ using namespace std;
 using namespace Eigen;
 
 
-const string training_images_filename = "mnist/train-images-idx3-ubyte";
-const string training_labels_filename = "mnist/train-labels-idx1-ubyte";
-const string testing_images_filename = "mnist/t10k-images-idx3-ubyte";
-const string testing_labels_filenames = "mnist/t10k-labels-idx1-ubyte";
+const string TRAINING_IMAGES_FILENAME = "mnist/train-images-idx3-ubyte";
+const string TRAINING_LABELS_FILENAME = "mnist/train-labels-idx1-ubyte";
+const string TESTING_IMAGES_FILENAME = "mnist/t10k-images-idx3-ubyte";
+const string TESTING_LABELS_FILENAME = "mnist/t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
 const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
@@ -61,7 +61,7 @@ public:
 
 	//num training samples
 
-
+	//num hidden layers
 
 	int num_input_neurons;
 	//num hidden neurons
@@ -79,7 +79,7 @@ public:
 
 	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total, buffer_taken;
 	unsigned int num_producers, num_consumers;
-	
+
 	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, int buffer_size){
 		num_input_neurons = IMAGE_SIZE;
 		num_output_neurons = 10;
@@ -89,7 +89,7 @@ public:
 		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
 		vecs_to_calc = vector<pair<RowVectorXd,RowVectorXd>>(buffer_size);
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
-		   first element of each set of inputs
+		   first element of each set of inputsoutput
 		*/
 		if(num_layers == 2){
 			layers.emplace_back(MatrixXd::Random(num_input_neurons + 1, num_output_neurons + 1));
@@ -111,7 +111,7 @@ public:
 		}
 		this->epochs = epochs;
 
-				
+
 
 		//TODO: finish this
 
@@ -139,7 +139,7 @@ public:
 
 
 	}
-	
+
 	void producer_thread(istream& images, istream& labels, unsigned int training_size){
 		while(images && pro_training_total < training_size){
 			pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
@@ -180,23 +180,24 @@ public:
 
 	//ELU Function Kevin Yan
 	double ELU(double x) {
-		if(x > 0) 
-			return x;
-		else 
-			return learning_rate*(exp(x)-1);
-
-	}
-	//ELU derivative Function Kevin Yan
-	double dELU(double x) {
-		if(x > 0)
-			return 1;
-		else
-			return ELU(x) + learning_rate;
-	}
-	 
-
-	//perceptron 
-	
+	if(x > 0)
+		return x;
+	else
+		return learningRate*(exp(x)-1);
+  }
+  //ELU derivative Function Kevin Yan
+  double dELU(double x) {
+    if(x > 0)
+      return 1;
+    else
+      return ELU(x) + learningRate;
+  //perceptron Kevin Yan
+  void perceptron() {
+    //set hidden nodes to 0
+    for(int i = 0; i <= num_input_nodes; i++) {
+      hidden_nodes = 0;
+    }
+  }
 	//This returns the loss for a single example, preconverted into a vector
 	//Always pass Eigen matrices & vectors by reference!
 	//We use true gradient descent since it is easiy parallelizable.
@@ -240,12 +241,12 @@ public:
 			}
 
 			int training_size = read_num(labels, 4);
-			
+
 			images.seekg(4*3, ios_base::cur); //skip over the number of examples, row size, and column size in the image data
 
 			vector<thread> threads;
 			for(unsigned int i = 0; i < num_producers; i++){ //valgrind complains about here TODO: fix that
-				threads.push_back(thread(&NeuralNetwork::producer_thread, this, ref(images), ref(labels), training_size)); 
+				threads.push_back(thread(&NeuralNetwork::producer_thread, this, ref(images), ref(labels), training_size));
 				/*reference args to a thread function must be wrapped in std::ref for the compiler to understand
 				 * that a reference and not a value argument is intended
 				 */
@@ -256,8 +257,8 @@ public:
 			}
 			for(thread& t : threads){
 				t.join();
-			} 
-			
+			}
+
 			MatrixXd& final_layer = layers.back();
 			RowVectorXd d_diffs(final_layer.cols());
 			for(int j = 0; j < final_layer.cols(); j++) d_diffs[j] = dELU(diffs[j]);
@@ -274,11 +275,59 @@ public:
 				}
 				sigma_v = sigma_v_next;
 			}
-			
+
 			images.close();
 			labels.close();
 		}
-		
+
+
+	}
+	//method to test (Kevin Yan)
+	void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
+		ifstream testing_images;
+		ifstream testing_labels;
+		// //read binary image and label files
+		// testing_images.open(testing_images_filename,ios::binary);
+		// testing_labels.open(testing_labels_filename,ios::binary);
+		//use read_num to get header info
+		int image_magic_num = read_num(testing_images, 1);
+		int num_images = read_num(testing_images,1);
+		int num_rows = read_num(testing_images,1);
+		int num_cols = read_num(testing_images,1);
+		int num_labels = read_num(testing_labels,1);
+		int label_magic_num = read_num(testing_labels, 1);
+		char buffer;
+		char number;
+		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
+
+		//check magic numbers
+		if(image_magic_num != 2051) {
+			cerr << "Bad Image Data! " << image_magic_num << endl;
+			exit(image_magic_num);
+		}
+		if(label_magic_num != 2049){
+			cerr << "Bad label data! " << magic << endl;
+			exit(label_magic_num);
+		}
+
+		//read image data
+		//grayscale
+		for(int i = 0; i < IMAGE_ROWS; i++) {
+			for(int j = 0; j < IMAGE_COLS; j++) {
+				testing_images.read(&buffer, sizeof(char));
+				buffer == 0 ? image_matrix[i][j] = 0 : image_matrix[i][j] = 1;
+			}
+		}
+		//get label
+		number = testing_labels.read(&number, sizeof(char));
+		int prediction = 0;
+		for(int i = 1; i < num_output_neurons; i++) {
+			if(SUBWITHOUTPUT[i] > SUBWITHOUTPUT[prediction]) {
+				prediction = i;
+			}
+		}
+
+
 
 	}
 
