@@ -183,14 +183,15 @@ public:
 	if(x > 0)
 		return x;
 	else
-		return learningRate*(exp(x)-1);
+		return learning_rate*(exp(x)-1);
   }
   //ELU derivative Function Kevin Yan
   double dELU(double x) {
     if(x > 0)
       return 1;
     else
-      return ELU(x) + learningRate;
+      return ELU(x) + learning_rate;
+	}
 	//This returns the loss for a single example, preconverted into a vector
 	//Always pass Eigen matrices & vectors by reference!
 	//We use true gradient descent since it is easiy parallelizable.
@@ -323,7 +324,7 @@ public:
 
 
 	}
-
+	
 	//save weights Carl?
 };
 
@@ -335,7 +336,7 @@ int main(int argc, char** argv){
 	int hidden_layer_size = (argc < 5)? 10: stoi(argv[4]);
 	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
 	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size, buffer_size);
-	net.train(training_images_filename, training_labels_filename);
+	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
 	//net.testing(testing_images_filename, testing_labels_filenames); //the nn param is presumably goimg to be removed
 
 }
