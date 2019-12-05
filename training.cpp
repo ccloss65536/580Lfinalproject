@@ -14,10 +14,10 @@ using namespace std;
 using namespace Eigen;
 
 
-const string training_images_filename = "mnist/train-images-idx3-ubyte";
-const string training_labels_filename = "mnist/train-labels-idx1-ubyte";
-const string testing_images_filename = "mnist/t10k-images-idx3-ubyte";
-const string testing_labels_filenames = "mnist/t10k-labels-idx1-ubyte";
+const string TRAINING_IMAGES_FILENAME = "mnist/train-images-idx3-ubyte";
+const string TRAINING_LABELS_FILENAME = "mnist/train-labels-idx1-ubyte";
+const string TESTING_IMAGES_FILENAME = "mnist/t10k-images-idx3-ubyte";
+const string TESTING_LABELS_FILENAME = "mnist/t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
 const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
@@ -286,26 +286,19 @@ public:
 	void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
 		ifstream testing_images;
 		ifstream testing_labels;
-		int image_magic_num;
-		int label_magic_num;
-		int num_images;
-		int num_labels;
-		int num_rows;
-		int num_cols;
+		// //read binary image and label files
+		// testing_images.open(testing_images_filename,ios::binary);
+		// testing_labels.open(testing_labels_filename,ios::binary);
+		//use read_num to get header info
+		int image_magic_num = read_num(testing_images, 1);
+		int num_images = read_num(testing_images,1);
+		int num_rows = read_num(testing_images,1);
+		int num_cols = read_num(testing_images,1);
+		int num_labels = read_num(testing_labels,1);
+		int label_magic_num = read_num(testing_labels, 1);
 		char buffer;
+		char number;
 		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
-		//read binary image and label files
-		testing_images.open(testing_images_filename,ios::binary);
-		testing_labels.open(testing_labels_filename,ios::binary);
-		//read in image headers
-		testing_images.read((char*)&image_magic_num,sizeof(image_magic_num));
-		testing_images.read((char*)&num_images,sizeof(num_images));
-		testing_images.read((char*)&num_rows,sizeof(num_rows));
-		testing_images.read((char*)&num_cols,sizeof(num_cols));
-
-		//read in label headers
-		testing_labels.read((char*)&label_magic_num,sizeof(label_magic_num));
-		testing_labels.read((char*)&num_labels,sizeof(num_labels));
 
 		//check magic numbers
 		if(image_magic_num != 2051) {
@@ -325,8 +318,9 @@ public:
 				buffer == 0 ? image_matrix[i][j] = 0 : image_matrix[i][j] = 1;
 			}
 		}
-
-		int predction = 0;
+		//get label
+		number = testing_labels.read(&number, sizeof(char));
+		int prediction = 0;
 		for(int i = 1; i < num_output_neurons; i++) {
 			if(SUBWITHOUTPUT[i] > SUBWITHOUTPUT[prediction]) {
 				prediction = i;
