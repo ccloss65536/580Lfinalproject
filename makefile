@@ -21,12 +21,12 @@ push:
 	@#and put the entire imput string into an enviroment variable called $REPLY
 $(NAME1): $(NAME1).cpp 
 	$(COMPILE) -c $(FLAGS)  $(NAME1).cpp 
-	$(COMPILE) $(FLAGS) $(NAME1).o -o  $(NAME1)
+	$(COMPILE) $(FLAGS) $(NAME1).o -o  $(NAME1).exe
 $(NAME2): $(NAME2).cpp
 	$(COMPILE) -c $(FLAGS) $(NAME2).cpp
-	$(COMPILE) $(FLAGS) $(NAME2).o -o $(NAME2)
+	$(COMPILE) $(FLAGS) $(NAME2).o -o $(NAME2).exe
 clean: backup
-	rm -f *.o *.swp *.gch .go* $(NAME1) .nfs*
+	rm -f *.o *.swp *.gch .go* $(NAME1) *.exe .nfs*
 backup:
 	cd .. && 	tar -cvzf  $(shell date +%s)_$(FILE) 580Lfinalproject
 	mv ../$(shell date +%s)_$(FILE) ~/backups
