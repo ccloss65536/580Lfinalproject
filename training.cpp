@@ -172,7 +172,7 @@ public:
 			l = unique_lock<mutex>(loss_sum_lock);
 			total_loss += loss_ex;
 			diffs += example.second - example.first;
-			l.unlock();	https://mycourses.binghamton.edu/webapps/assignment/uploadAssignment?content_id=_964569_1&course_id=_211651_1&group_id=&mode=view
+			l.unlock();
 		}
 	}
 
@@ -191,13 +191,6 @@ public:
       return 1;
     else
       return ELU(x) + learningRate;
-  //perceptron Kevin Yan
-  void perceptron() {
-    //set hidden nodes to 0
-    for(int i = 0; i <= num_input_nodes; i++) {
-      hidden_nodes = 0;
-    }
-  }
 	//This returns the loss for a single example, preconverted into a vector
 	//Always pass Eigen matrices & vectors by reference!
 	//We use true gradient descent since it is easiy parallelizable.
