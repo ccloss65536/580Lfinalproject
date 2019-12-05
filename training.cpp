@@ -4,49 +4,47 @@
 #include <algorithm>
 #include <thread>
 #include <mutex>
+#include <vector>
+#include <stdint.h>
 #include <condition_variable>
-#include <Eigen/Dense>
+#include "Eigen/Dense"
 #include <cmath>
 
 using namespace std;
-
-//num input neurons
-int num_input_neurons;
-//num hidden neurons
-int num_hidden_neurons;
-//num output neurons
-int num_output_neurons;
-//epochs?
-//learning rate
-double learning_rate;
-
-
 using namespace Eigen;
 
 
-const string training_images_filename = "train-images-idx3-ubyte";
-const string training_labels_filename = "train-labels-idx1-ubyte";
-const string testing_images_filename = "t10k-images-idx3-ubyte";
-const string testing_labels_filenames = "t10k-labels-idx1-ubyte";
-const int IMAGE_ROWS = 28
-const int IMAGE_COLS = 28
+const string training_images_filename = "mnist/train-images-idx3-ubyte";
+const string training_labels_filename = "mnist/train-labels-idx1-ubyte";
+const string testing_images_filename = "mnist/t10k-images-idx3-ubyte";
+const string testing_labels_filenames = "mnist/t10k-labels-idx1-ubyte";
+const int IMAGE_ROWS = 28;
+const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
 
 
 //WHYYY are MNIST numbers in big endian
-int read_num(char* buff, size_t size){
+//refactored to not require an external buffer, since that is annoying
+//Use this to read in the 4-byte numbers from MNIST files or the numbers may be backwards!!!
+int read_num(istream& in, int size){
+	if(size > 8 || size <= 0) {
+		cerr << "Bad size for number!";
+		exit(67);
+	}
+	uint8_t buff[8] = {0,0,0,0,0,0,0,0};
+	in.read( (char*)buff, size);
 	int out = 5;
-	char* test_p = &test;
+	uint8_t* test_p = (uint8_t*)&out;
 	if(*test_p){ //system is little endian, make sure to reverse the number
-		for(size_t i = size - 1; i <= 0; i+--){
-			*test_p = buff + i;
-			*test_p++;
+		for(int i = size - 1; i >= 0; i--){
+			*test_p = *(buff + i);
+			test_p++;
 		}
 	}
 	else{
-		for(size_t i = 0; i < size; i++){
-			*test_p = buff + i;
-			*test_p++;
+		for(int i = 0; i < size; i++){
+			*test_p = *(buff + i);
+			test_p++;
 		}
 	}
 	return out;
@@ -74,27 +72,43 @@ public:
 	//learning rate
 	double learning_rate;
 	vector<MatrixXd> layers;
-	mutex loss_sum_lock, producer, consumer, generate;
+	vector<RowVectorXd> layer_sums;
+	mutex loss_sum_lock, producer, consumer, generate, layer_s;
 	condition_variable full, empty;
-	vector<pair<VectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
+	vector<pair<RowVectorXd,RowVectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
+
 	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total, buffer_taken;
 	unsigned int num_producers, num_consumers;
 
 	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, int buffer_size){
 		num_input_neurons = IMAGE_SIZE;
 		num_output_neurons = 10;
+		num_hidden_neurons = hidden_layer_size;
 		this->learning_rate = learning_rate;
-		this->buffer_size = buffer_size
+		this->buffer_size = buffer_size;
 		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
-		vecs_to_calc = vector(buffer_size);
+		vecs_to_calc = vector<pair<RowVectorXd,RowVectorXd>>(buffer_size);
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
 		   first element of each set of inputsoutput
 		*/
-		layers.emplace(layers.end(), MatrixXd::Random(num_input_neurons + 1, hidden_layer_size + 1));
-		for(int i = 0; i  < num_layers - 2; i++){
-			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, hidden_layer_size + 1));
+		if(num_layers == 2){
+			layers.emplace_back(MatrixXd::Random(num_input_neurons + 1, num_output_neurons + 1));
 		}
-		layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons));
+		else{
+			layers.emplace(layers.end(), MatrixXd::Random(num_input_neurons + 1, hidden_layer_size + 1));
+			for(int i = 0; i  < num_layers - 2; i++){
+				layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, hidden_layer_size + 1));
+			}
+			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
+		}
+		for(MatrixXd& l : layers){
+			l(0,0) = 1;
+			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
+		}
+		layer_sums = vector<RowVectorXd>(num_layers);
+		for(int i = 0; i < num_layers; i++){
+			layer_sums[i] = RowVectorXd::Zero(layers[i].cols());
+		}
 		this->epochs = epochs;
 
 
@@ -105,20 +119,31 @@ public:
 
 	//Image
 
-	pair<VectorXd> generate_training_example(istream& images, istream& labels){
+	pair<RowVectorXd,RowVectorXd> generate_training_example(istream& images, istream& labels){
 		//TODO: finish this
-		char buff[IMAGE_SIZE];
-		auto l = unique_lock(generate);
-		images.read(buff, IMAGE_SIZE);
+		uint8_t buff[IMAGE_SIZE];
+		uint8_t label;
+		auto l = unique_lock<mutex>(generate);
+		images.read( (char*)buff, IMAGE_SIZE);
+		labels.read( (char*)&label, 1);
 		l.unlock();
-		VectorXd target();
+		RowVectorXd image(IMAGE_SIZE + 1);
+		image[0] = 1;
+		for(int i = 1; i < IMAGE_SIZE + 1; i++){
+			image[i] = buff[i];
+		}
+		RowVectorXd target = RowVectorXd::Zero(num_output_neurons + 1);
+		target[label + 1] = 1;
+		target[0] = 1; //bias
+		return pair<RowVectorXd,RowVectorXd>(image,target);
+
 
 	}
 
 	void producer_thread(istream& images, istream& labels, unsigned int training_size){
 		while(images && pro_training_total < training_size){
-			pair<VectorXd> example = generate_training_example(file);
-			auto l = unique_lock(producer);
+			pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
+			auto l = unique_lock<mutex>(producer);
 			while(buffer_taken >= buffer_size) full.wait(l);
 			vecs_to_calc[pro_buffer_index] = example;
 			pro_buffer_index = (pro_buffer_index + 1) % buffer_size;
@@ -129,23 +154,25 @@ public:
 		}
 	}
 
-	void consumer_thread(double& total_loss, unsigned int training_size){
-		while(training_total < training_size){
-			auto l = unique_lock(consumer); //lock is taken as soon as this object is constructed
+	void consumer_thread(double& total_loss, unsigned int training_size, RowVectorXd& diffs){
+		while(con_training_total < training_size){
+			auto l = unique_lock<mutex>(consumer); //lock is taken as soon as this object is constructed
 			while(buffer_taken <= 0){
 				empty.wait(l);
 			}
 
-			training_total++;
-			pair<VectorXd> example = vecs_to_calc[con_buffer_index]
+			con_training_total++;
+			pair<RowVectorXd,RowVectorXd> example = vecs_to_calc[con_buffer_index];
 			con_buffer_index = (con_buffer_index + 1) % buffer_size;
 			buffer_taken--;
 			full.notify_one();
 			l.unlock();
-			double loss = loss(example.first, example.second);
-			l = unique_lock(loss_sum_lock);
-			total_loss += loss;
-			l.unlock();
+			RowVectorXd last_inputs(num_hidden_neurons);
+			double loss_ex = loss(example.first, example.second);
+			l = unique_lock<mutex>(loss_sum_lock);
+			total_loss += loss_ex;
+			diffs += example.second - example.first;
+			l.unlock();	https://mycourses.binghamton.edu/webapps/assignment/uploadAssignment?content_id=_964569_1&course_id=_211651_1&group_id=&mode=view
 		}
 	}
 
@@ -173,58 +200,84 @@ public:
   }
 	//This returns the loss for a single example, preconverted into a vector
 	//Always pass Eigen matrices & vectors by reference!
-	double loss(const VectorXd& input_vector, const VectorXd& reference_vec){
-		VectorXd temp = input_vector;
+	//We use true gradient descent since it is easiy parallelizable.
+	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
+		RowVectorXd temp = input_vector;
+		int i = 0;
 		for(MatrixXd l : layers){
-			temp = l * temp;
+			auto lock = unique_lock<mutex>(layer_s);
+			layer_sums[i] += temp;
+			lock.unlock();
+			temp = temp * l;
 			for(int i = 0; i < temp.size(); i++){
 				temp[i] = ELU(temp[i]);
 			}
-		return (reference_vec - temp).dot(reference_vec - temp); //feel free to change this to something faster
+			i++;
+		}
+		return pow( (reference_vec - temp).sum(), 2); //feel free to change this to something faster
 	}
 
 
 	//Learning
-	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate (I am unclaimimng this part).
+	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate.
 
-	void train(const& string image_file, const string& label_file){
+	void train(const string& image_file, const string& label_file){
 		for(int i = 0; i < epochs; i++){
 			double loss = 0;
+			RowVectorXd sum_last_inputs = RowVectorXd::Zero(num_hidden_neurons);
+			RowVectorXd diffs = RowVectorXd::Zero(num_output_neurons);
 			ifstream images(image_file);
 			ifstream labels(label_file);
-			char magic_buff[4];
-			images.read(magic, 4);
-			int magic = read_int(magic_buff, 4);
+			int magic = read_num(images, 4);
 
 			if(magic != 2051){
-				cerr << "Bad image data! " << magic << endl;
+				cerr << "Bad image data! Magic: " << magic << endl;
 				exit(magic);
 			}
-			labels.read(magic_buff, 4);
-			magic = read_int(magic_buff, 4);
+			magic = read_num(labels, 4);
 			if(magic != 2049){
-				cerr << "Bad label data! " << magic << endl;
+				cerr << "Bad label data! Magic:" << magic << endl;
 				exit(magic);
 			}
 
-			//TODO: read out dimensions and training size
+			int training_size = read_num(labels, 4);
 
+			images.seekg(4*3, ios_base::cur); //skip over the number of examples, row size, and column size in the image data
 
 			vector<thread> threads;
-			for(unsigned int i = 0; i < num_producers; i++){
-				threads.push_back(thread(producer_thread, this, i, training_size));
+			for(unsigned int i = 0; i < num_producers; i++){ //valgrind complains about here TODO: fix that
+				threads.push_back(thread(&NeuralNetwork::producer_thread, this, ref(images), ref(labels), training_size));
+				/*reference args to a thread function must be wrapped in std::ref for the compiler to understand
+				 * that a reference and not a value argument is intended
+				 */
+
 			}
 			for(unsigned int i = 0; i < num_consumers; i++){
-				threads.push_back(thread(consumer_thread, this, loss, training_size));
+				threads.push_back(thread(&NeuralNetwork::consumer_thread, this, ref(loss), training_size, ref(diffs)));
 			}
 			for(thread& t : threads){
 				t.join();
 			}
 
+			MatrixXd& final_layer = layers.back();
+			RowVectorXd d_diffs(final_layer.cols());
+			for(int j = 0; j < final_layer.cols(); j++) d_diffs[j] = dELU(diffs[j]);
+			RowVectorXd sigma_v = (diffs.array() * d_diffs.array() * sum_last_inputs.array()).matrix(); //array allows for simple component-wise ops
 
-			//backpropagate
+			for( int i = layers.size() - 2; i >= 0; i--){
+				//find next sigma vector, then add learning * sigma * layer_sum to each col
+				RowVectorXd sigma_v_next(layers[i - 1].cols());
+				for(int j = 0; j<  sigma_v_next.cols(); j++){
+					sigma_v_next[j] = layers[i].row(j).dot(sigma_v) * dELU(layer_sums[i][j]);
+				}
+				for(int j = 1; j < layers[i + 1].cols();j++){
+					layers[i + 1].col(j) += learning_rate * (sigma_v.array() * layer_sums[i+1].array()).matrix();
+				}
+				sigma_v = sigma_v_next;
+			}
 
-			f.close();
+			images.close();
+			labels.close();
 		}
 
 
@@ -284,13 +337,18 @@ public:
 
 	}
 
-
-
-
-
-
-	//Reading input Carl
-
-	//save weights
+	//save weights Carl?
 };
-//main
+
+
+int main(int argc, char** argv){
+	double learning_rate = (argc < 2)? .1 : stod(string(argv[1]));
+	int num_layers = (argc < 3)? 3: stoi(argv[2]);
+	int epochs = (argc < 4)? 10: stoi(argv[3]);
+	int hidden_layer_size = (argc < 5)? 10: stoi(argv[4]);
+	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
+	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size, buffer_size);
+	net.train(training_images_filename, training_labels_filename);
+	//net.testing(testing_images_filename, testing_labels_filenames); //the nn param is presumably goimg to be removed
+
+}
