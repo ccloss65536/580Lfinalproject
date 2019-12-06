@@ -133,8 +133,8 @@ public:
 		l.unlock();
 		RowVectorXd image(IMAGE_SIZE + 1);
 		image[0] = 1;
-		for(int i = 1; i < IMAGE_SIZE + 1; i++){
-			image[i] = buff[i];
+		for(int i = 0; i < IMAGE_SIZE; i++){
+			image[i + 1] = buff[i];
 		}
 		RowVectorXd target = RowVectorXd::Zero(num_output_neurons + 1);
 		target[label + 1] = 1;
@@ -208,7 +208,7 @@ public:
 			if(is_training) layer_sums[i] += temp;
 			lock.unlock();
 			temp = temp * l;
-			for(int j = 0; j < temp.size(); j++){
+			for(int j = 0; j < temp.cols(); j++){
 				temp[j] = ELU(temp[j]);
 			}
 			i++;
@@ -232,7 +232,7 @@ public:
 		for(int i = 0; i < epochs; i++){
 			is_training = true;
 			double loss = 0;
-			RowVectorXd sum_last_inputs = RowVectorXd::Zero(num_hidden_neurons);
+			RowVectorXd sum_last_inputs = RowVectorXd::Zero(num_hidden_neurons + 1);
 			RowVectorXd diffs = RowVectorXd::Zero(num_output_neurons + 1);
 			ifstream images(image_file);
 			ifstream labels(label_file);
@@ -272,7 +272,7 @@ public:
 			for(int j = 0; j < final_layer.cols(); j++) d_diffs[j] = dELU(diffs[j]);
 			RowVectorXd sigma_v = (diffs.array() * d_diffs.array() * sum_last_inputs.array()).matrix(); //array allows for simple component-wise ops
 
-			for( int i = layers.size() - 2; i >= 0; i--){
+			for( int i = layers.size() - 2; i > 0; i--){
 				//find next sigma vector, then add learning * sigma * layer_sum to each col
 				RowVectorXd sigma_v_next(layers[i - 1].cols());
 				for(int j = 0; j<  sigma_v_next.cols(); j++){
