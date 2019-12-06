@@ -14,10 +14,10 @@ using namespace std;
 using namespace Eigen;
 
 
-const string TRAINING_IMAGES_FILENAME = "mnist/train-images-idx3-ubyte";
-const string TRAINING_LABELS_FILENAME = "mnist/train-labels-idx1-ubyte";
-const string TESTING_IMAGES_FILENAME = "mnist/t10k-images-idx3-ubyte";
-const string TESTING_LABELS_FILENAME = "mnist/t10k-labels-idx1-ubyte";
+const string TRAINING_IMAGES_FILENAME = "baby_mnist/train-images-idx3-ubyte";
+const string TRAINING_LABELS_FILENAME = "baby_mnist/train-labels-idx1-ubyte";
+const string TESTING_IMAGES_FILENAME = "baby_mnist/t10k-images-idx3-ubyte";
+const string TESTING_LABELS_FILENAME = "baby_mnist/t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
 const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
@@ -79,6 +79,7 @@ public:
 
 	unsigned int pro_buffer_index, con_buffer_index, buffer_size, con_training_total, pro_training_total, buffer_taken;
 	unsigned int num_producers, num_consumers;
+	bool is_training;
 
 	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, int buffer_size){
 		num_input_neurons = IMAGE_SIZE;
@@ -87,6 +88,7 @@ public:
 		this->learning_rate = learning_rate;
 		this->buffer_size = buffer_size;
 		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
+		pro_training_total = 0;
 		vecs_to_calc = vector<pair<RowVectorXd,RowVectorXd>>(buffer_size);
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
 		   first element of each set of inputsoutput
@@ -107,10 +109,12 @@ public:
 		}
 		layer_sums = vector<RowVectorXd>(num_layers);
 		for(int i = 0; i < num_layers; i++){
-			layer_sums[i] = RowVectorXd::Zero(layers[i].cols());
+			layer_sums[i] = RowVectorXd::Zero(layers[i].rows());
 		}
 		this->epochs = epochs;
-
+		num_producers = 4;
+		num_consumers = 4;
+		is_training = false;
 
 
 		//TODO: finish this
@@ -168,13 +172,16 @@ public:
 			full.notify_one();
 			l.unlock();
 			RowVectorXd last_inputs(num_hidden_neurons);
-			double loss_ex = loss(example.first, example.second);
+			RowVectorXd result = evaluate(example.first ,example.second);
+			double loss_ex = loss(result, example.second);
 			l = unique_lock<mutex>(loss_sum_lock);
 			total_loss += loss_ex;
-			diffs += example.second - example.first;
+			diffs += example.second - result;
 			l.unlock();
 		}
 	}
+
+	
 
 
 
@@ -192,23 +199,29 @@ public:
     else
       return ELU(x) + learning_rate;
 	}
-	//This returns the loss for a single example, preconverted into a vector
-	//Always pass Eigen matrices & vectors by reference!
-	//We use true gradient descent since it is easiy parallelizable.
-	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
+
+	RowVectorXd evaluate(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
 		RowVectorXd temp = input_vector;
 		int i = 0;
 		for(MatrixXd l : layers){
 			auto lock = unique_lock<mutex>(layer_s);
-			layer_sums[i] += temp;
+			if(is_training) layer_sums[i] += temp;
 			lock.unlock();
 			temp = temp * l;
-			for(int i = 0; i < temp.size(); i++){
-				temp[i] = ELU(temp[i]);
+			for(int j = 0; j < temp.size(); j++){
+				temp[j] = ELU(temp[j]);
 			}
 			i++;
 		}
-		return pow( (reference_vec - temp).sum(), 2); //feel free to change this to something faster
+		return temp;
+
+
+	}
+	//This returns the loss for a single example, given the precomputed result and the correct answer
+	//Always pass Eigen matrices & vectors by reference!
+	//We use true gradient descent since it is easiy parallelizable.
+	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){ 
+		return pow( (reference_vec - input_vector).sum(), 2); //feel free to change this to something faster
 	}
 
 
@@ -217,9 +230,10 @@ public:
 
 	void train(const string& image_file, const string& label_file){
 		for(int i = 0; i < epochs; i++){
+			is_training = true;
 			double loss = 0;
 			RowVectorXd sum_last_inputs = RowVectorXd::Zero(num_hidden_neurons);
-			RowVectorXd diffs = RowVectorXd::Zero(num_output_neurons);
+			RowVectorXd diffs = RowVectorXd::Zero(num_output_neurons + 1);
 			ifstream images(image_file);
 			ifstream labels(label_file);
 			int magic = read_num(images, 4);
@@ -277,7 +291,7 @@ public:
 
 	}
 	//method to test (Kevin Yan)
-	void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
+	/*void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
 		ifstream testing_images;
 		ifstream testing_labels;
 		// //read binary image and label files
@@ -323,7 +337,7 @@ public:
 
 
 
-	}
+	}*/
 	
 	//save weights Carl?
 };
