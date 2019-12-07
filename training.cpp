@@ -318,35 +318,35 @@ public:
 	void perceptron() {
 			//set all hidden nodes to 0;
 			for(int i = 0; i < num_hidden_layers; i++) {
-				for(int j = 0; j < num_hidden_neurons; j++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
 					hidden_in[i][j] = 0.0;
 				}
 			}
 			//set
-			for(int i = 0; i < num_output_neurons; i++) {
+			for(int i = 1; i < num_output_neurons+1; i++) {
 				output_in[i] = 0.0;
 			}
 			//input layer to hidden layer
-			for(int i = 0; i < num_input_neurons; i++) {
-				for(int j = 0; j < num_hidden_neurons; j++) {
+			for(int i = 1; i < num_input_neurons+1; i++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
 					hidden_in[0][j] += out1[i]*layers[0](i,j);
 				}
 			}
 			//do all hidden layers
 			for(int i = 1; i < num_hidden_layers; i++) {
-				for(int j = 0; j < num_hidden_neurons; j++) {
-					for(int k = 0 ; k < num_hidden_neurons; k++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
+					for(int k = 2 ; k < num_hidden_neurons+1; k++) {
 						hidden_in[i][k] += hidden_out[i-1][j]*layers[i](j,k);
 					}
 				}
 				//Run ELU on incoming to get outgoing
-				for(int j = 0; j < num_hidden_neurons; j++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
 					hidden_out[i][j] = ELU(hidden_in[i][j]);
 				}
 			}
 			//final layer
-			for(int i = 0; i < num_hidden_neurons; i++) {
-				for(int j = 0; j < num_output_neurons; j++) {
+			for(int i = 1; i < num_hidden_neurons+1; i++) {
+				for(int j = 1; j < num_output_neurons+1; j++) {
 					output_in[j] += hidden_out[num_hidden_layers-1][i]*layers[num_layers](i,j);
 				}
 			}
