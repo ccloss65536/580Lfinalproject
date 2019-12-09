@@ -70,7 +70,8 @@ public:
 	//take training labels
 
 	//num training samples
-
+	//num layer
+	int num_layers;
 	//num hidden layers
 	int num_hidden_layers;
   //num input neurons
@@ -98,6 +99,7 @@ public:
 		num_hidden_neurons = hidden_layer_size;
 		this->learning_rate = learning_rate;
 		this->buffer_size = buffer_size;
+		this->num_layers = num_layers;
 		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
 		pro_training_total = 0;
 		vecs_to_calc = vector<pair<RowVectorXd,RowVectorXd>>(buffer_size);
@@ -139,7 +141,7 @@ public:
 			hidden_in[i] = new double[num_hidden_neurons]; //allocate space for each layer
 		}
 		output_in = new double[num_output_neurons];
-		output_out = new double[num_output_neurons]l
+		output_out = new double[num_output_neurons];
 		//TODO: finish this
 
 	}
@@ -370,7 +372,7 @@ public:
 		char buffer;
 		char label;
 		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
-		int correcCount;
+		int correctCount = 0;
 
 		//check magic numbers
 		if(image_magic_num != 2051) {
@@ -378,7 +380,7 @@ public:
 			exit(image_magic_num);
 		}
 		if(label_magic_num != 2049){
-			cerr << "Bad label data! " << magic << endl;
+			cerr << "Bad label data! " << image_magic_num << endl;
 			exit(label_magic_num);
 		}
 		//loop through images in test set
@@ -396,7 +398,7 @@ public:
 			}
 
 			//get label of testing example
-			label = testing_labels.read(&number, sizeof(char));
+			testing_labels.read(&label, sizeof(char));
 			//run inputs through nn
 			perceptron();
 			//get nn prediction
