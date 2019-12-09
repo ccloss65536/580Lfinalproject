@@ -119,6 +119,7 @@ public:
 		for(MatrixXd& l : layers){
 			l(0,0) = 1;
 			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
+			//cout << l.rows() << " " << l.cols() << endl;
 		}
 		layer_sums = vector<RowVectorXd>(num_layers);
 		for(int i = 0; i < num_layers; i++){
@@ -192,6 +193,7 @@ public:
 
 			con_training_total++;
 			pair<RowVectorXd,RowVectorXd> example = vecs_to_calc[con_buffer_index];
+			cout << example.first.cols() << " " << example.second.cols() << endl;
 			con_buffer_index = (con_buffer_index + 1) % buffer_size;
 			buffer_taken--;
 			full.notify_one();
@@ -258,7 +260,6 @@ public:
 		for(int i = 0; i < epochs; i++){
 			is_training = true;
 			double loss = 0;
-			RowVectorXd sum_last_inputs = RowVectorXd::Zero(num_hidden_neurons + 1);
 			RowVectorXd diffs = RowVectorXd::Zero(num_output_neurons + 1);
 			ifstream images(image_file);
 			ifstream labels(label_file);
@@ -280,14 +281,14 @@ public:
 
 			vector<thread> threads;
 			for(unsigned int i = 0; i < num_producers; i++){ //valgrind complains about here TODO: fix that
-				threads.push_back(thread(&NeuralNetwork::producer_thread, this, ref(images), ref(labels), training_size));
+				threads.emplace_back(thread(&NeuralNetwork::producer_thread, this, ref(images), ref(labels), training_size));
 				/*reference args to a thread function must be wrapped in std::ref for the compiler to understand
 				 * that a reference and not a value argument is intended
 				 */
 
 			}
 			for(unsigned int i = 0; i < num_consumers; i++){
-				threads.push_back(thread(&NeuralNetwork::consumer_thread, this, ref(loss), training_size, ref(diffs)));
+				threads.emplace_back(thread(&NeuralNetwork::consumer_thread, this, ref(loss), training_size, ref(diffs)));
 			}
 			for(thread& t : threads){
 				t.join();
@@ -295,23 +296,29 @@ public:
 
 			MatrixXd& final_layer = layers.back();
 			RowVectorXd d_diffs(final_layer.cols());
+			//cout << diffs.cols() << endl;
 			for(int j = 0; j < final_layer.cols(); j++) d_diffs[j] = dELU(diffs[j]);
-			RowVectorXd sigma_v = (diffs.array() * d_diffs.array() * sum_last_inputs.array()).matrix(); //array allows for simple component-wise ops
+			RowVectorXd sigma_v = (diffs.array() * d_diffs.array()).matrix(); //array allows for simple component-wise ops
 
-			for( int i = layers.size() - 2; i > 0; i--){
+			for( int i = layers.size() - 1; i > 0; i--){
 				//find next sigma vector, then add learning * sigma * layer_sum to each col
 				RowVectorXd sigma_v_next(layers[i - 1].cols());
 				for(int j = 0; j<  sigma_v_next.cols(); j++){
+					//cout << layers[i].cols() << " " << sigma_v.cols() << endl;
+					//cout << "!!!!" << endl;
 					sigma_v_next[j] = layers[i].row(j).dot(sigma_v) * dELU(layer_sums[i][j]);
 				}
-				for(int j = 1; j < layers[i + 1].cols();j++){
-					layers[i + 1].col(j) += learning_rate * (sigma_v.array() * layer_sums[i+1].array()).matrix();
+				for(int j = 1; j < layers[i].cols();j++){
+					//cout << sigma_v.cols() << " " << layer_sums[i].cols() << endl;
+					auto temp = learning_rate * sigma_v[j] * layer_sums[i];
+					layers[i].col(j) += temp;
 				}
 				sigma_v = sigma_v_next;
 			}
 
 			images.close();
 			labels.close();
+			//cout << "epoch complete!" << endl;
 		}
 
 
@@ -422,7 +429,7 @@ int main(int argc, char** argv){
 	double learning_rate = (argc < 2)? .1 : stod(string(argv[1]));
 	int num_layers = (argc < 3)? 3: stoi(argv[2]);
 	int epochs = (argc < 4)? 10: stoi(argv[3]);
-	int hidden_layer_size = (argc < 5)? 10: stoi(argv[4]);
+	int hidden_layer_size = (argc < 5)? 11: stoi(argv[4]);
 	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
 	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size, buffer_size);
 	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
