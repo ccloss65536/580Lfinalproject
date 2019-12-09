@@ -55,14 +55,26 @@ int read_num(istream& in, int size){
 
 class NeuralNetwork{
 public:
+	//input neuron;
+	double *out1;
+	//hidden neurons
+	double **hidden_out;
+	double **hidden_in;
+	//output neurons;
+	double *output_out;
+	double *output_in;
+
+
 	//take training image file name
 
 	//take training labels
 
 	//num training samples
-
+	//num layer
+	int num_layers;
 	//num hidden layers
-
+	int num_hidden_layers;
+  //num input neurons
 	int num_input_neurons;
 	//num hidden neurons
 	int num_hidden_neurons;
@@ -87,6 +99,7 @@ public:
 		num_hidden_neurons = hidden_layer_size;
 		this->learning_rate = learning_rate;
 		this->buffer_size = buffer_size;
+		this->num_layers = num_layers;
 		pro_buffer_index = con_buffer_index = con_training_total = buffer_taken = 0;
 		pro_training_total = 0;
 		vecs_to_calc = vector<pair<RowVectorXd,RowVectorXd>>(buffer_size);
@@ -117,7 +130,19 @@ public:
 		num_consumers = 4;
 		is_training = false;
 
+		//Allocate space for incoming and outgoing values of each neuron layer for testing (Kevin)
 
+		out1 = new double[num_input_neurons];
+		hidden_out = new double*[num_layers-2];	//allocate layers-2 double pointers
+		for(int i = 0; i < hidden_layer_size; i++) {
+			hidden_out[i] = new double[num_hidden_neurons]; //allocate space for each layer
+		}
+		hidden_in = new double*[num_layers-2];	//allocate layers-2 double pointers
+		for(int i = 0; i < hidden_layer_size; i++) {
+			hidden_in[i] = new double[num_hidden_neurons]; //allocate space for each layer
+		}
+		output_in = new double[num_output_neurons];
+		output_out = new double[num_output_neurons];
 		//TODO: finish this
 
 	}
@@ -183,7 +208,7 @@ public:
 		}
 	}
 
-	
+
 
 
 
@@ -222,13 +247,14 @@ public:
 	//This returns the loss for a single example, given the precomputed result and the correct answer
 	//Always pass Eigen matrices & vectors by reference!
 	//We use true gradient descent since it is easiy parallelizable.
-	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){ 
+	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
 		return pow( (reference_vec - input_vector).sum(), 2); //feel free to change this to something faster
 	}
 
 
 	//Learning
 	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate.
+
 
 	void train(const string& image_file, const string& label_file){
 		for(int i = 0; i < epochs; i++){
@@ -297,10 +323,49 @@ public:
 
 
 	}
+	//calculate outputs giving input
+	void perceptron() {
+			//set all hidden nodes to 0;
+			for(int i = 0; i < num_hidden_layers; i++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
+					hidden_in[i][j] = 0.0;
+				}
+			}
+			//set
+			for(int i = 1; i < num_output_neurons+1; i++) {
+				output_in[i] = 0.0;
+			}
+			//input layer to hidden layer
+			for(int i = 1; i < num_input_neurons+1; i++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
+					hidden_in[0][j] += out1[i]*layers[0](i,j);
+				}
+			}
+			//do all hidden layers
+			for(int i = 1; i < num_hidden_layers; i++) {
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
+					for(int k = 2 ; k < num_hidden_neurons+1; k++) {
+						hidden_in[i][k] += hidden_out[i-1][j]*layers[i](j,k);
+					}
+				}
+				//Run ELU on incoming to get outgoing
+				for(int j = 1; j < num_hidden_neurons+1; j++) {
+					hidden_out[i][j] = ELU(hidden_in[i][j]);
+				}
+			}
+			//final layer
+			for(int i = 1; i < num_hidden_neurons+1; i++) {
+				for(int j = 1; j < num_output_neurons+1; j++) {
+					output_in[j] += hidden_out[num_hidden_layers-1][i]*layers[num_layers](i,j);
+				}
+			}
+
+	}
 	//method to test (Kevin Yan)
-	/*void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
+	void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
 		ifstream testing_images;
 		ifstream testing_labels;
+
 		// //read binary image and label files
 		// testing_images.open(testing_images_filename,ios::binary);
 		// testing_labels.open(testing_labels_filename,ios::binary);
@@ -312,8 +377,9 @@ public:
 		int num_labels = read_num(testing_labels,1);
 		int label_magic_num = read_num(testing_labels, 1);
 		char buffer;
-		char number;
+		char label;
 		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
+		int correctCount = 0;
 
 		//check magic numbers
 		if(image_magic_num != 2051) {
@@ -321,31 +387,40 @@ public:
 			exit(image_magic_num);
 		}
 		if(label_magic_num != 2049){
-			cerr << "Bad label data! " << magic << endl;
+			cerr << "Bad label data! " << image_magic_num << endl;
 			exit(label_magic_num);
 		}
+		//loop through images in test set
+		for(int img_index = 0; img_index < num_images; img_index++) {
+			//read image data
+			//put into matrix and input neurons of nn
+			int position = 1;
+			for(int i = 0; i < IMAGE_ROWS; i++) {
+				for(int j = 0; j < IMAGE_COLS; j++) {
+					testing_images.read(&buffer, sizeof(char));
+					image_matrix[i][j] = buffer;	//might not need this line since we put it into an array and don't need the matrix really
+					out1[position] = buffer;
+					position++;
+				}
+			}
 
-		//read image data
-		//grayscale
-		for(int i = 0; i < IMAGE_ROWS; i++) {
-			for(int j = 0; j < IMAGE_COLS; j++) {
-				testing_images.read(&buffer, sizeof(char));
-				buffer == 0 ? image_matrix[i][j] = 0 : image_matrix[i][j] = 1;
+			//get label of testing example
+			testing_labels.read(&label, sizeof(char));
+			//run inputs through nn
+			perceptron();
+			//get nn prediction
+			int prediction = 0;
+			for(int i = 1; i < num_output_neurons; i++) {
+				if(output_out[i] > output_out[prediction]) {
+					prediction = i;
+				}
+			}
+			if(prediction == label) {
+				correctCount++;
 			}
 		}
-		//get label
-		number = testing_labels.read(&number, sizeof(char));
-		int prediction = 0;
-		for(int i = 1; i < num_output_neurons; i++) {
-			if(SUBWITHOUTPUT[i] > SUBWITHOUTPUT[prediction]) {
-				prediction = i;
-			}
-		}
+	}
 
-
-
-	}*/
-	
 	//save weights Carl?
 };
 
