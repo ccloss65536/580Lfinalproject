@@ -142,17 +142,15 @@ public:
 		uint8_t buff[IMAGE_SIZE];
 		char label = labels.get();
 		images.read( (char*)buff, IMAGE_SIZE);
-		//cout << labels.tellg() << endl;
 		RowVectorXd image(IMAGE_SIZE + 1);
 		image[0] = 1;
 		for(int i = 0; i < IMAGE_SIZE; i++){
 			image[i + 1] = buff[i];
 		}
 		RowVectorXd target = RowVectorXd::Zero(num_output_neurons + 1);
-		//cout << label + '\0' << endl; 
 		target[label + 1] = 1;
 		target[0] = 1; //bias
-		//cout << "-----------\n" << target << "\n------------\n";
+
 		return pair<RowVectorXd,RowVectorXd>(image,target);
 
 
@@ -191,15 +189,12 @@ public:
 	//This returns the loss for a single example, given the precomputed result and the correct answer
 	//Always pass Eigen matrices & vectors by reference!
 	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
-		//cout << input_vector << endl;
-		//cout << reference_vec << endl;
-		//cout << reference_vec - input_vector << endl;
 		return pow( (reference_vec - input_vector).sum(), 2); //feel free to change this to something faster
 	}
 
 
 	//Learning
-	//My plan is to calculate loss on every training example in parallel, to add to a variable, then backpropagate.
+
 
 
 	void train(const string& image_file, const string& label_file){
@@ -369,10 +364,10 @@ int main(int argc, char** argv){
 	srand((unsigned int) time(0));
 	double learning_rate = (argc < 2)? .01 : stod(string(argv[1]));
 	int num_layers = (argc < 3)? 4: stoi(argv[2]);
-	int epochs = (argc < 4)? 1000: stoi(argv[3]);
-	int hidden_layer_size = (argc < 5)? 110: stoi(argv[4]);
+	int epochs = (argc < 4)? 4: stoi(argv[3]);
+	int hidden_layer_size = (argc < 5)? 300: stoi(argv[4]);
 	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size);
 	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
-	net.testing(TESTING_IMAGES_FILENAME, TESTING_LABELS_FILENAME); //the nn param is presumably goimg to be removed
+	net.testing(TESTING_IMAGES_FILENAME, TESTING_LABELS_FILENAME);
 
 }
