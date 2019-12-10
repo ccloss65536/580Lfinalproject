@@ -186,7 +186,6 @@ public:
 	}
 	//This returns the loss for a single example, given the precomputed result and the correct answer
 	//Always pass Eigen matrices & vectors by reference!
-	//We use true gradient descent since it is easiy parallelizable.
 	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
 		return pow( (reference_vec - input_vector).sum(), 2); //feel free to change this to something faster
 	}
@@ -217,11 +216,16 @@ public:
 			//cout << labels.gcount() << endl;
 
 			images.seekg(4*3, ios_base::cur); //skip over the number of examples, row size, and column size in the image data
-					//find next sigma vector, then add learning * sigma * layer_sum to each col
-			for(int k = 0; k < training_size; k++){
+			//find next sigma vector, then add learning * sigma * layer_sum to each col
+			double prev_loss = 9999999999999999;
+			double loss_ex = 0;
+			for(int k = 0; k < training_size && prev_loss - loss_ex < .001; k++){
+				cout << prev_loss - loss_ex << endl; 
 				pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
 				RowVectorXd result = evaluate(example.first ,example.second);
-				double loss_ex = loss(result, example.second);
+				prev_loss = loss_ex;
+				loss_ex = loss(result, example.second);
+
 				RowVectorXd diff = example.second - result;
 				MatrixXd& final_layer = layers.back();
 				RowVectorXd d_diff(final_layer.cols());
@@ -229,21 +233,20 @@ public:
 				for(int j = 0; j < final_layer.cols(); j++) d_diff[j] = dELU(diff[j]);
 				RowVectorXd sigma_v = (diff.array() * d_diff.array()).matrix(); //array allows for simple component-wise ops
 
-				for( int i = layers.size() - 1; i > 0; i--){
+				for( int m = layers.size() - 1; m > 0; m--){
 
 					RowVectorXd sigma_v_next(layers[i - 1].cols());
 					for(int j = 0; j<  sigma_v_next.cols(); j++){
 
-						sigma_v_next[j] = layers[i].row(j).dot(sigma_v) * dELU(layer_sums[i][j]);
+						sigma_v_next[j] = layers[m].row(j).dot(sigma_v) * dELU(layer_sums[m][j]);
 					}
-					for(int j = 1; j < layers[i].cols();j++){
+					for(int j = 1; j < layers[m].cols();j++){
 
-						auto temp = learning_rate * sigma_v[j] * layer_sums[i];
-						layers[i].col(j) += temp;
+						auto temp = learning_rate * sigma_v[j] * layer_sums[m];
+						layers[m].col(j) += temp;
 					}
 					sigma_v = sigma_v_next;
 				}
-
 		}
 		images.close();
 		labels.close();
