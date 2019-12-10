@@ -13,8 +13,8 @@ using namespace std;
 using namespace Eigen;
 
 
-const string TRAINING_IMAGES_FILENAME = "baby_mnist/train-images-idx3-ubyte";
-const string TRAINING_LABELS_FILENAME = "baby_mnist/train-labels-idx1-ubyte";
+const string TRAINING_IMAGES_FILENAME = "mnist/train-images-idx3-ubyte";
+const string TRAINING_LABELS_FILENAME = "mnist/train-labels-idx1-ubyte";
 const string TESTING_IMAGES_FILENAME = "baby_mnist/t10k-images-idx3-ubyte";
 const string TESTING_LABELS_FILENAME = "baby_mnist/t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
@@ -139,17 +139,19 @@ public:
 
 	pair<RowVectorXd,RowVectorXd> generate_training_example(istream& images, istream& labels){
 		uint8_t buff[IMAGE_SIZE];
-		char label;
+		char label = labels.get();
 		images.read( (char*)buff, IMAGE_SIZE);
-		labels.read( &label, 1);
+		//cout << labels.tellg() << endl;
 		RowVectorXd image(IMAGE_SIZE + 1);
 		image[0] = 1;
 		for(int i = 0; i < IMAGE_SIZE; i++){
 			image[i + 1] = buff[i];
 		}
 		RowVectorXd target = RowVectorXd::Zero(num_output_neurons + 1);
+		//cout << label + '\0' << endl; 
 		target[label + 1] = 1;
 		target[0] = 1; //bias
+		//cout << "-----------\n" << target << "\n------------\n";
 		return pair<RowVectorXd,RowVectorXd>(image,target);
 
 
@@ -188,6 +190,9 @@ public:
 	//This returns the loss for a single example, given the precomputed result and the correct answer
 	//Always pass Eigen matrices & vectors by reference!
 	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
+		//cout << input_vector << endl;
+		//cout << reference_vec << endl;
+		//cout << reference_vec - input_vector << endl;
 		return pow( (reference_vec - input_vector).sum(), 2); //feel free to change this to something faster
 	}
 
@@ -218,14 +223,14 @@ public:
 
 			images.seekg(4*3, ios_base::cur); //skip over the number of examples, row size, and column size in the image data
 			//find next sigma vector, then add learning * sigma * layer_sum to each col
-			double prev_loss = 9999999999999999;
-			double loss_ex = 0;
-			for(int k = 0; k < training_size && prev_loss - loss_ex < .001; k++){
-				cout << prev_loss - loss_ex << endl;
+			double prev_loss = 9999999;
+			double loss_ex = 999999;
+			for(int k = 0; k < training_size /*&& (prev_loss - loss_ex >= .001)*/; k++){
 				pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
 				RowVectorXd result = evaluate(example.first ,example.second);
 				prev_loss = loss_ex;
 				loss_ex = loss(result, example.second);
+				if(k % 10000 == 0) cout << loss_ex << endl;
 
 				RowVectorXd diff = example.second - result;
 				MatrixXd& final_layer = layers.back();
@@ -236,7 +241,7 @@ public:
 
 				for( int m = layers.size() - 1; m > 0; m--){
 
-					RowVectorXd sigma_v_next(layers[i - 1].cols());
+					RowVectorXd sigma_v_next(layers[m - 1].cols());
 					for(int j = 0; j<  sigma_v_next.cols(); j++){
 
 						sigma_v_next[j] = layers[m].row(j).dot(sigma_v) * dELU(layer_sums[m][j]);
@@ -267,7 +272,7 @@ public:
 			for(int i = 1; i < num_output_neurons+1; i++) {
 				output_in[i] = 0.0;
 			}
-			//input layer to hidden layer
+			//input layer to hiddim makefileen layer
 			for(int i = 1; i < num_input_neurons+1; i++) {
 				for(int j = 1; j < num_hidden_neurons+1; j++) {
 					hidden_in[0][j] += out1[i]*layers[0](i,j);
@@ -360,11 +365,11 @@ public:
 
 
 int main(int argc, char** argv){
-	double learning_rate = (argc < 2)? .1 : stod(string(argv[1]));
-	int num_layers = (argc < 3)? 3: stoi(argv[2]);
-	int epochs = (argc < 4)? 10: stoi(argv[3]);
-	int hidden_layer_size = (argc < 5)? 11: stoi(argv[4]);
-	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
+	srand((unsigned int) time(0));
+	double learning_rate = (argc < 2)? .01 : stod(string(argv[1]));
+	int num_layers = (argc < 3)? 4: stoi(argv[2]);
+	int epochs = (argc < 4)? 1000: stoi(argv[3]);
+	int hidden_layer_size = (argc < 5)? 110: stoi(argv[4]);
 	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size);
 	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
 	net.testing(TESTING_IMAGES_FILENAME, TESTING_LABELS_FILENAME); //the nn param is presumably goimg to be removed
