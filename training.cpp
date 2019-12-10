@@ -3,7 +3,6 @@
 #include <string>
 #include <algorithm>
 #include <thread>
-#include <mutex>
 #include <vector>
 #include <stdint.h>
 #include <condition_variable>
@@ -138,13 +137,10 @@ public:
 	//Image
 
 	pair<RowVectorXd,RowVectorXd> generate_training_example(istream& images, istream& labels){
-		//TODO: finish this
 		uint8_t buff[IMAGE_SIZE];
 		char label;
 		images.read( (char*)buff, IMAGE_SIZE);
 		labels.read( &label, 1);
-		//cout << labels << endl;
-		cout << labels.gcount() << endl;
 		RowVectorXd image(IMAGE_SIZE + 1);
 		image[0] = 1;
 		for(int i = 0; i < IMAGE_SIZE; i++){
@@ -152,9 +148,7 @@ public:
 		}
 		RowVectorXd target = RowVectorXd::Zero(num_output_neurons + 1);
 		target[label + 1] = 1;
-		//cout << target << endl;
 		target[0] = 1; //bias
-		//exit(0);
 		return pair<RowVectorXd,RowVectorXd>(image,target);
 
 
@@ -250,10 +244,9 @@ public:
 					sigma_v = sigma_v_next;
 				}
 
-				images.close();
-				labels.close();
-
 		}
+		images.close();
+		labels.close();
 	}
 
 
