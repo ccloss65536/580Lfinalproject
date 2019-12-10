@@ -93,6 +93,7 @@ public:
 		num_hidden_neurons = hidden_layer_size;
 		this->learning_rate = learning_rate;
 		this->num_layers = num_layers;
+		num_hidden_layers = num_layers - 2;
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
 		   first element of each set of inputsoutput
 		*/
@@ -119,18 +120,18 @@ public:
 
 		//Allocate space for incoming and outgoing values of each neuron layer for testing (Kevin)
 
-		out1 = new double[num_input_neurons];
+		out1 = new double[num_input_neurons + 1];
 		hidden_out = new double*[num_layers-2];	//allocate layers-2 double pointers
-		for(int i = 0; i < hidden_layer_size; i++) {
-			hidden_out[i] = new double[num_hidden_neurons]; //allocate space for each layer
+		for(int i = 0; i < num_layers-2; i++) {
+			hidden_out[i] = new double[num_hidden_neurons + 1]; //allocate space for each layer + 1 bias
 		}
 		hidden_in = new double*[num_layers-2];	//allocate layers-2 double pointers
-		for(int i = 0; i < hidden_layer_size; i++) {
-			hidden_in[i] = new double[num_hidden_neurons]; //allocate space for each layer
+		for(int i = 0; i < num_layers-2; i++) {
+			hidden_in[i] = new double[num_hidden_neurons + 1]; //allocate space for each layer + 1 bias
 		}
-		output_in = new double[num_output_neurons];
-		output_out = new double[num_output_neurons];
-		//TODO: finish this
+		output_in = new double[num_output_neurons + 1];
+		output_out = new double[num_output_neurons + 1];
+
 
 	}
 
@@ -220,7 +221,7 @@ public:
 			double prev_loss = 9999999999999999;
 			double loss_ex = 0;
 			for(int k = 0; k < training_size && prev_loss - loss_ex < .001; k++){
-				cout << prev_loss - loss_ex << endl; 
+				cout << prev_loss - loss_ex << endl;
 				pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
 				RowVectorXd result = evaluate(example.first ,example.second);
 				prev_loss = loss_ex;
@@ -287,26 +288,26 @@ public:
 			//final layer
 			for(int i = 1; i < num_hidden_neurons+1; i++) {
 				for(int j = 1; j < num_output_neurons+1; j++) {
-					output_in[j] += hidden_out[num_hidden_layers-1][i]*layers[num_layers](i,j);
+					output_in[j] += hidden_out[num_hidden_layers-1][i]*layers[num_layers-1].coeff(i,j);
 				}
 			}
 
 	}
 	//method to test (Kevin Yan)
-	void testing(vector<MatrixXd> nn, string testing_images_filename, string testinglabels_filename) {
-		ifstream testing_images;
-		ifstream testing_labels;
+	void testing(string testing_images_filename, string testing_labels_filename) {
+		ifstream testing_images(testing_images_filename);
+		ifstream testing_labels(testing_labels_filename);
 
 		// //read binary image and label files
 		// testing_images.open(testing_images_filename,ios::binary);
 		// testing_labels.open(testing_labels_filename,ios::binary);
 		//use read_num to get header info
-		int image_magic_num = read_num(testing_images, 1);
-		int num_images = read_num(testing_images,1);
-		int num_rows = read_num(testing_images,1);
-		int num_cols = read_num(testing_images,1);
-		int num_labels = read_num(testing_labels,1);
-		int label_magic_num = read_num(testing_labels, 1);
+		int image_magic_num = read_num(testing_images, 4);
+		int num_images = read_num(testing_images,4);
+		int num_rows = read_num(testing_images,4);
+		int num_cols = read_num(testing_images,4);
+		int label_magic_num = read_num(testing_labels, 4);
+		int num_labels = read_num(testing_labels,4);
 		char buffer;
 		char label;
 		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
@@ -314,11 +315,11 @@ public:
 
 		//check magic numbers
 		if(image_magic_num != 2051) {
-			cerr << "Bad Image Data! " << image_magic_num << endl;
+			cerr << "Bad Testing Image Data! " << image_magic_num << endl;
 			exit(image_magic_num);
 		}
 		if(label_magic_num != 2049){
-			cerr << "Bad label data! " << image_magic_num << endl;
+			cerr << "Bad Testing label data! " << label_magic_num << endl;
 			exit(label_magic_num);
 		}
 		//loop through images in test set
@@ -350,6 +351,8 @@ public:
 				correctCount++;
 			}
 		}
+		cout << "Correct Count: " << correctCount << endl;
+		cout << "Total Count: " << num_images << endl;
 	}
 
 	//save weights Carl?
@@ -364,6 +367,6 @@ int main(int argc, char** argv){
 	int buffer_size = (argc < 6)? 50: stoi(argv[5]);
 	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size);
 	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
-	//net.testing(testing_images_filename, testing_labels_filenames); //the nn param is presumably goimg to be removed
+	net.testing(TESTING_IMAGES_FILENAME, TESTING_LABELS_FILENAME); //the nn param is presumably goimg to be removed
 
 }
