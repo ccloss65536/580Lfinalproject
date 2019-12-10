@@ -349,7 +349,7 @@ public:
 			}
 
 			//get label of testing example
-			testing_labels.read( &label, 4);
+			testing_labels.read( &label, sizeof(char));
 			//run inputs through nn
 			perceptron();
 			//get nn prediction
