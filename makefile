@@ -3,7 +3,8 @@ SHELL := /bin/bash
 NUM = FINAL
 HEADERS =
 COMPILE = g++
-FLAGS = -O3  -Wall -Wextra -Wno-unused-parameter -lrt -pthread -lm
+OPT_FLAG = -g
+FLAGS = $(OPT_FLAG)  -Wall -Wextra -Wno-unused-parameter -lrt -pthread -lm
 NAME1 = training
 NAME2 =
 FILE = ccloss1_$(NUM).tar.gz
@@ -20,10 +21,10 @@ push:
 	@#Only in bash, read can have a prompt,
 	@#and put the entire imput string into an enviroment variable called $REPLY
 $(NAME1): $(NAME1).cpp
-	$(COMPILE) -c -g $(FLAGS)  $(NAME1).cpp
+	$(COMPILE) -c $(FLAGS)  $(NAME1).cpp
 	$(COMPILE) $(FLAGS) $(NAME1).o -o  $(NAME1).exe
 $(NAME2): $(NAME2).cpp
-	$(COMPILE) -c -g $(FLAGS) $(NAME2).cpp
+	$(COMPILE) -c $(FLAGS) $(NAME2).cpp
 	$(COMPILE) $(FLAGS) $(NAME2).o -o $(NAME2).exe
 clean: backup
 	rm -f *.o *.swp *.gch .go* $(NAME1) *.exe .nfs*
