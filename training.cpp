@@ -138,10 +138,12 @@ public:
 	//Image
 
 	pair<RowVectorXd,RowVectorXd> generate_training_example(istream& images, istream& labels){
+
 		uint8_t buff[IMAGE_SIZE];
 		char label;
 		images.read( (char*)buff, IMAGE_SIZE);
 		labels.read( &label, 1);
+		cout << label << endl;
 		RowVectorXd image(IMAGE_SIZE + 1);
 		image[0] = 1;
 		for(int i = 0; i < IMAGE_SIZE; i++){
@@ -273,6 +275,9 @@ public:
 					hidden_in[0][j] += out1[i]*layers[0](i,j);
 				}
 			}
+			for(int i = 1; i < num_hidden_neurons+1; i++) {
+				hidden_out[0][i] = ELU(hidden_in[0][i]);
+			}
 			//do all hidden layers
 			for(int i = 1; i < num_hidden_layers; i++) {
 				for(int j = 1; j < num_hidden_neurons+1; j++) {
@@ -290,6 +295,9 @@ public:
 				for(int j = 1; j < num_output_neurons+1; j++) {
 					output_in[j] += hidden_out[num_hidden_layers-1][i]*layers[num_layers-1].coeff(i,j);
 				}
+			}
+			for(int i = 1; i < num_output_neurons+1; i++) {
+				output_out[i] = output_in[i];
 			}
 
 	}
@@ -312,6 +320,10 @@ public:
 		char label;
 		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
 		int correctCount = 0;
+
+		// for(MatrixXd m : layers) {
+		// 	cout << m << endl;
+		// }
 
 		//check magic numbers
 		if(image_magic_num != 2051) {
@@ -337,17 +349,19 @@ public:
 			}
 
 			//get label of testing example
-			testing_labels.read(&label, sizeof(char));
+			testing_labels.read( &label, sizeof(char));
 			//run inputs through nn
 			perceptron();
 			//get nn prediction
-			int prediction = 0;
-			for(int i = 1; i < num_output_neurons; i++) {
+			int prediction = 1;
+			for(int i = 2; i < num_output_neurons + 1; i++) {
+				// cout << output_out[i] << endl;
 				if(output_out[i] > output_out[prediction]) {
 					prediction = i;
 				}
 			}
-			if(prediction == label) {
+			cout << prediction << "==" << label + 1 << endl;
+			if(prediction == label+1) {
 				correctCount++;
 			}
 		}
