@@ -108,6 +108,7 @@ public:
 			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
 		}
 		for(MatrixXd& l : layers){
+			l = (l.array() * .01).matrix(); //reducing the absolute value of the weights makes the network actually descend
 			l(0,0) = 1;
 			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
 		}
