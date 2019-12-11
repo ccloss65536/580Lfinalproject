@@ -82,17 +82,19 @@ public:
 	int epochs;
 	//learning rate
 	double learning_rate;
+	double momentum_constant;
 	vector<MatrixXd> layers;
-	vector<RowVectorXd> layer_sums;
+	vector<RowVectorXd> layer_inputs;
 	vector<pair<RowVectorXd,RowVectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
 	bool is_training;
 
-	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size){
+	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, double momentum){
 		num_input_neurons = IMAGE_SIZE;
 		num_output_neurons = 10;
 		num_hidden_neurons = hidden_layer_size;
 		this->learning_rate = learning_rate;
 		this->num_layers = num_layers;
+		momentum_constant = momentum;
 		num_hidden_layers = num_layers - 2;
 		/* We use an extra hidden "neuron" to perpetuate the bias term, the
 		   first element of each set of inputsoutput
@@ -108,13 +110,13 @@ public:
 			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
 		}
 		for(MatrixXd& l : layers){
-			l = (l.array() * .0001).matrix(); //reducing the absolute value of the weights makes the network actually descend
+			l = (l.array() * .0000001).matrix(); //reducing the absolute value of the weights makes the network actually descend
 			l(0,0) = 1;
 			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
 		}
-		layer_sums = vector<RowVectorXd>(num_layers);
+		layer_inputs = vector<RowVectorXd>(num_layers);
 		for(int i = 0; i < num_layers; i++){
-			layer_sums[i] = RowVectorXd::Zero(layers[i].rows());
+			layer_inputs[i] = RowVectorXd::Zero(layers[i].rows());
 		}
 		this->epochs = epochs;
 		is_training = false;
@@ -176,7 +178,7 @@ public:
 		RowVectorXd temp = input_vector;
 		int i = 0;
 		for(MatrixXd l : layers){
-			if(is_training) layer_sums[i] = temp;
+			if(is_training) layer_inputs[i] = temp;
 			temp = temp * l;
 			for(int j = 0; j < temp.cols(); j++){
 				temp[j] = ELU(temp[j]);
@@ -189,7 +191,8 @@ public:
 	//This returns the loss for a single example, given the precomputed result and the correct answer
 	//Always pass Eigen matrices & vectors by reference!
 	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
-		return pow( (reference_vec - input_vector).sum(), 2); //feel free to change this to something faster
+		RowVectorXd diff = reference_vec - input_vector;
+		return diff.dot(diff); //feel free to change this to something faster
 	}
 
 
@@ -198,6 +201,10 @@ public:
 
 
 	void train(const string& image_file, const string& label_file){
+		vector<MatrixXd> momenta; //hold the momentum vectors for each weight column
+		for(MatrixXd l : layers){
+			momenta.emplace_back(MatrixXd::Zero(l.rows(), l.cols()));
+		}
 		for(int i = 0; i < epochs; i++){
 			is_training = true;
 			ifstream images(image_file);
@@ -221,9 +228,9 @@ public:
 			//find next sigma vector, then add learning * sigma * layer_sum to each col
 			double prev_loss = 9999999;
 			double loss_ex = 999999;
-			for(int k = 0; k < training_size /*&& (prev_loss - loss_ex >= .001)*/; k++){
+			for(int k = 0; k < training_size; k++){
 				pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
-				RowVectorXd result = evaluate(example.first ,example.second);
+				RowVectorXd result = evaluate(example.first, example.second);
 				prev_loss = loss_ex;
 				loss_ex = loss(result, example.second);
 				if(k % 10000 == 0){
@@ -232,7 +239,7 @@ public:
 					for(int z = 1; z < result.cols(); z++){
 						if(result[z] > max){max = result[z]; argmax = z;}
 					}
-					cout << argmax - 1 << " | " << example.second << " | " << loss_ex << endl;
+					cout << argmax - 1 << " | " << example.second << " | " << loss_ex <<  " | " << result <<  endl;
 					//cout << layers[0] << endl; 
 				}
 
@@ -249,17 +256,19 @@ public:
 						sigma_v_next = RowVectorXd(layers[m - 1].cols());
 						for(int j = 0; j<  sigma_v_next.cols(); j++){
 
-							sigma_v_next[j] = layers[m].row(j).dot(sigma_v) * dELU(layer_sums[m][j]);
+							sigma_v_next[j] = layers[m].row(j).dot(sigma_v) * dELU(layer_inputs[m][j]);
 						}
 					}
-					for(int j = 1; j < layers[m].cols();j++){
-
-						auto temp = learning_rate * sigma_v[j] * layer_sums[m];
+					for(int j = 1; j < layers[m].cols();j++){	
+						RowVectorXd temp =((learning_rate * sigma_v[j] * layer_inputs[m])	+ (momentum_constant * momenta[m].col(j).transpose()));
+						momenta[m].col(j) = temp;
+						//cout << layers[m].col(j).rows() << endl; exit(0);
 						layers[m].col(j) += temp;
 					}
 					sigma_v = sigma_v_next;
 				}
 		}
+		cout << endl;
 		images.close();
 		labels.close();
 	}
@@ -369,7 +378,7 @@ public:
 					prediction = i;
 				}
 			}
-			cout << prediction << "==" << label + 1 << endl;
+			//cout << prediction << "==" << label + 1 << endl;
 			if(prediction == label+1) {
 				correctCount++;
 			}
@@ -382,12 +391,15 @@ public:
 };
 
 int main(int argc, char** argv){
-	srand((unsigned int) time(0));
+	unsigned int seed = (unsigned int) time(0);
+	cout << "Seed: " << seed << endl;
+	srand(seed);
 	double learning_rate = (argc < 2)? .01 : stod(string(argv[1]));
 	int num_layers = (argc < 3)? 4: stoi(argv[2]);
 	int epochs = (argc < 4)? 4: stoi(argv[3]);
 	int hidden_layer_size = (argc < 5)? 300: stoi(argv[4]);
-	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size);
+	double momentum = (argc < 6)? .9:stod(argv[5]);
+	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size, momentum);
 	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
 	net.testing(TESTING_IMAGES_FILENAME, TESTING_LABELS_FILENAME);
 
