@@ -108,7 +108,7 @@ public:
 			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
 		}
 		for(MatrixXd& l : layers){
-			l = (l.array() * .01).matrix(); //reducing the absolute value of the weights makes the network actually descend
+			l = (l.array() * .0001).matrix(); //reducing the absolute value of the weights makes the network actually descend
 			l(0,0) = 1;
 			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
 		}
@@ -226,21 +226,31 @@ public:
 				RowVectorXd result = evaluate(example.first ,example.second);
 				prev_loss = loss_ex;
 				loss_ex = loss(result, example.second);
-				if(k % 10000 == 0) cout << loss_ex << endl;
+				if(k % 10000 == 0){
+					double max = 0;
+					int argmax = 1;
+					for(int z = 1; z < result.cols(); z++){
+						if(result[z] > max){max = result[z]; argmax = z;}
+					}
+					cout << argmax - 1 << " | " << example.second << " | " << loss_ex << endl;
+					//cout << layers[0] << endl; 
+				}
 
 				RowVectorXd diff = example.second - result;
 				MatrixXd& final_layer = layers.back();
 				RowVectorXd d_diff(final_layer.cols());
 				//cout << diff.cols() << endl;
-				for(int j = 0; j < final_layer.cols(); j++) d_diff[j] = dELU(diff[j]);
+				for(int j = 0; j < final_layer.cols(); j++) d_diff[j] = dELU(result[j]);
 				RowVectorXd sigma_v = (diff.array() * d_diff.array()).matrix(); //array allows for simple component-wise ops
+				RowVectorXd sigma_v_next;
+				for( int m = layers.size() - 1; m >= 0; m--){
 
-				for( int m = layers.size() - 1; m > 0; m--){
+					if(m > 0){
+						sigma_v_next = RowVectorXd(layers[m - 1].cols());
+						for(int j = 0; j<  sigma_v_next.cols(); j++){
 
-					RowVectorXd sigma_v_next(layers[m - 1].cols());
-					for(int j = 0; j<  sigma_v_next.cols(); j++){
-
-						sigma_v_next[j] = layers[m].row(j).dot(sigma_v) * dELU(layer_sums[m][j]);
+							sigma_v_next[j] = layers[m].row(j).dot(sigma_v) * dELU(layer_sums[m][j]);
+						}
 					}
 					for(int j = 1; j < layers[m].cols();j++){
 
@@ -256,7 +266,7 @@ public:
 
 
 	}
-	//calculate outputs giving input
+//calculate outputs giving input
 	void perceptron() {
 			//set all hidden nodes to 0;
 			for(int i = 0; i < num_hidden_layers; i++) {
@@ -268,11 +278,14 @@ public:
 			for(int i = 1; i < num_output_neurons+1; i++) {
 				output_in[i] = 0.0;
 			}
-			//input layer to hiddim makefileen layer
+			//input layer to hidden layer
 			for(int i = 1; i < num_input_neurons+1; i++) {
 				for(int j = 1; j < num_hidden_neurons+1; j++) {
 					hidden_in[0][j] += out1[i]*layers[0](i,j);
 				}
+			}
+			for(int i = 1; i < num_hidden_neurons+1; i++) {
+				hidden_out[0][i] = ELU(hidden_in[0][i]);
 			}
 			//do all hidden layers
 			for(int i = 1; i < num_hidden_layers; i++) {
@@ -291,6 +304,9 @@ public:
 				for(int j = 1; j < num_output_neurons+1; j++) {
 					output_in[j] += hidden_out[num_hidden_layers-1][i]*layers[num_layers-1].coeff(i,j);
 				}
+			}
+			for(int i = 1; i < num_output_neurons+1; i++) {
+				output_out[i] = output_in[i];
 			}
 
 	}
@@ -313,6 +329,10 @@ public:
 		char label;
 		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
 		int correctCount = 0;
+
+		// for(MatrixXd m : layers) {
+		// 	cout << m << endl;
+		// }
 
 		//check magic numbers
 		if(image_magic_num != 2051) {
@@ -338,17 +358,19 @@ public:
 			}
 
 			//get label of testing example
-			testing_labels.read(&label, sizeof(char));
+			testing_labels.read( &label, sizeof(char));
 			//run inputs through nn
 			perceptron();
 			//get nn prediction
-			int prediction = 0;
-			for(int i = 1; i < num_output_neurons; i++) {
+			int prediction = 1;
+			for(int i = 2; i < num_output_neurons + 1; i++) {
+				// cout << output_out[i] << endl;
 				if(output_out[i] > output_out[prediction]) {
 					prediction = i;
 				}
 			}
-			if(prediction == label) {
+			cout << prediction << "==" << label + 1 << endl;
+			if(prediction == label+1) {
 				correctCount++;
 			}
 		}
@@ -358,7 +380,6 @@ public:
 
 	//save weights Carl?
 };
-
 
 int main(int argc, char** argv){
 	srand((unsigned int) time(0));
