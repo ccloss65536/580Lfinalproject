@@ -20,6 +20,7 @@ const string TESTING_LABELS_FILENAME = "baby_mnist/t10k-labels-idx1-ubyte";
 const int IMAGE_ROWS = 28;
 const int IMAGE_COLS = 28;
 const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels in a MNIST image
+const int BATCH_SIZE = 60;
 
 
 //WHYYY are MNIST numbers in big endian
@@ -88,6 +89,7 @@ public:
 	vector<RowVectorXd> layer_inputs;
 	vector<pair<RowVectorXd,RowVectorXd>> vecs_to_calc; //put input and expected output vectors into this, and take them out to process
 	bool is_training;
+	int example_num;
 
 	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, double momentum, double elu_weight){
 		num_input_neurons = IMAGE_SIZE;
@@ -113,12 +115,12 @@ public:
 			layers.emplace(layers.end(), MatrixXd::Random(hidden_layer_size + 1, num_output_neurons + 1));
 		}
 		for(MatrixXd& l : layers){
-			l = (l.array() * .0000001).matrix(); //reducing the absolute value of the weights makes the network actually descend
+			l = (l.array() * .00005).matrix(); //reducing the absolute value of the weights makes the network actually descend
 			l(0,0) = 1;
 			for(int i = 1; i < l.rows(); i++) l(i, 0) = 0;
 		}
 		layer_inputs = vector<RowVectorXd>(num_layers);
-		for(int i = 0; i < num_layers; i++){
+		for(int i = 0; i < num_layers - 1; i++){
 			layer_inputs[i] = RowVectorXd::Zero(layers[i].rows());
 		}
 		this->epochs = epochs;
@@ -137,6 +139,7 @@ public:
 		}
 		output_in = new double[num_output_neurons + 1];
 		output_out = new double[num_output_neurons + 1];
+		example_num = 0;
 
 
 	}
@@ -145,6 +148,9 @@ public:
 
 	pair<RowVectorXd,RowVectorXd> generate_training_example(istream& images, istream& labels){
 		uint8_t buff[IMAGE_SIZE];
+		images.seekg(example_num * IMAGE_SIZE, ios_base::cur);
+		labels.seekg(example_num, ios_base::cur);
+		//if(images.fail() || labels.fail()){cout << -example_num << endl; exit(0);}
 		char label = labels.get();
 		images.read( (char*)buff, IMAGE_SIZE);
 		RowVectorXd image(IMAGE_SIZE + 1);
@@ -155,6 +161,10 @@ public:
 		RowVectorXd target = RowVectorXd::Constant(num_output_neurons + 1, 0);
 		target[label + 1] = 1;
 		target[0] = 1; //bias
+		images.seekg(-example_num * IMAGE_SIZE - IMAGE_SIZE, ios_base::cur);
+		labels.seekg(-example_num - 1, ios_base::cur);
+		//cout << images.fail() << " " << labels.fail() << labels.tellg() << endl;
+		//if(images.fail() || labels.fail()){cout << example_num << endl; exit(0);}
 
 		return pair<RowVectorXd,RowVectorXd>(image,target);
 
@@ -194,9 +204,18 @@ public:
 	//This returns the loss for a single example, given the precomputed result and the correct answer
 	//Always pass Eigen matrices & vectors by reference!
 	double loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
+		//Mean Square loss
 		RowVectorXd diff = reference_vec - input_vector;
 		return diff.dot(diff); //feel free to change this to something faster
+		//RowVectorXd log_in = input_vector.array().log().matrix();
+		//return log_in.dot(reference_vec);
 	}
+
+	/*ArrayXd d_loss(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
+		Array<double, 1,-1> out = (input_vector.array() * reference_vec.array()).transpose();
+		return out.inverse();
+
+	}*/
 
 
 	//Learning
@@ -210,8 +229,8 @@ public:
 		}
 		for(int i = 0; i < epochs; i++){
 			is_training = true;
-			ifstream images(image_file);
-			ifstream labels(label_file);
+			ifstream images(image_file, ios::binary);
+			ifstream labels(label_file, ios::binary);
 			int magic = read_num(images, 4);
 
 			if(magic != 2051){
@@ -231,25 +250,37 @@ public:
 			//find next sigma vector, then add learning * sigma * layer_sum to each col
 			double prev_loss = 9999999;
 			double loss_ex = 999999;
+
+			vector<int> order(training_size);
+			for(int n = 0; n < training_size; n++){
+				order[n] = n;
+			}
+			random_shuffle(order.begin(), order.end());
 			for(int k = 0; k < training_size; k++){
+				//for(int g = 0; g  < BATCH_SIZE; g++){
+				example_num = order[k];
 				pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
 				RowVectorXd result = evaluate(example.first, example.second);
 				prev_loss = loss_ex;
 				loss_ex = loss(result, example.second);
-				if(k % 10000 == 0){
+				if(example_num % 10000 == 0){
 					double max = 0;
 					int argmax = 1;
 					for(int z = 1; z < result.cols(); z++){
-						if(result[z] > max){max = result[z]; argmax = z;}
+							if(result[z] > max){max = result[z]; argmax = z;}
 					}
 					cout << argmax - 1 << " | " << example.second << " | " << loss_ex <<  " | " << result <<  endl;
-					//cout << layers[0] << endl; 
+					if(loss_ex != loss_ex){
+						cerr << "Network diverged!" << endl;
+						exit(45);
+					}
 				}
-
-				RowVectorXd diff = example.second - result;
+				
 				MatrixXd& final_layer = layers.back();
 				RowVectorXd d_diff(final_layer.cols());
-				//cout << diff.cols() << endl;
+
+				RowVectorXd diff = example.second - result;
+				//ArrayXd d_loss_arr = d_loss(result, example.second);
 				for(int j = 0; j < final_layer.cols(); j++) d_diff[j] = dELU(result[j]);
 				RowVectorXd sigma_v = (diff.array() * d_diff.array()).matrix(); //array allows for simple component-wise ops
 				RowVectorXd sigma_v_next;
@@ -275,7 +306,7 @@ public:
 		labels.close();
 	}
 
-
+	cout << "training complete!" << endl;
 	}
 //calculate outputs giving input
 	void perceptron() {
