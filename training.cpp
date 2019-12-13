@@ -424,15 +424,16 @@ public:
 };
 
 int main(int argc, char** argv){
-	unsigned int seed = (unsigned int) time(0);
+
+	unsigned int seed = (unsigned int) time(0); //use seed 1576220813 for a good seed if you get *really* unlucky
 	cout << "Seed: " << seed << endl;
 	srand(seed);
-	double learning_rate = (argc < 2)? .01 : stod(string(argv[1]));
+	double learning_rate = (argc < 2)? .0004 : stod(string(argv[1]));
 	int num_layers = (argc < 3)? 4: stoi(argv[2]);
 	int epochs = (argc < 4)? 4: stoi(argv[3]);
-	int hidden_layer_size = (argc < 5)? 300: stoi(argv[4]);
+	int hidden_layer_size = (argc < 5)? 16: stoi(argv[4]);
 	double momentum = (argc < 6)? .9:stod(argv[5]);
-	double elu_weight = (argc < 7)? .01 : stod(argv[6]);
+	double elu_weight = (argc < 7)? .2 : stod(argv[6]);
 	NeuralNetwork net(learning_rate, num_layers, epochs, hidden_layer_size, momentum, elu_weight);
 	net.train(TRAINING_IMAGES_FILENAME, TRAINING_LABELS_FILENAME);
 	net.testing(TESTING_IMAGES_FILENAME, TESTING_LABELS_FILENAME);
