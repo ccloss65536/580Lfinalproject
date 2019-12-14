@@ -128,7 +128,7 @@ public:
 
 		//Allocate space for incoming and outgoing values of each neuron layer for testing (Kevin)
 
-		out1 = new double[num_input_neurons + 1];
+		/*out1 = new double[num_input_neurons + 1];
 		hidden_out = new double*[num_layers-2];	//allocate layers-2 double pointers
 		for(int i = 0; i < num_layers-2; i++) {
 			hidden_out[i] = new double[num_hidden_neurons + 1]; //allocate space for each layer + 1 bias
@@ -139,7 +139,7 @@ public:
 		}
 		output_in = new double[num_output_neurons + 1];
 		output_out = new double[num_output_neurons + 1];
-		example_num = 0;
+		example_num = 0;*/
 
 
 	}
@@ -187,7 +187,7 @@ public:
       return ELU(x) + elu_weight;
 	}
 
-	RowVectorXd evaluate(const RowVectorXd& input_vector, const RowVectorXd& reference_vec){
+	RowVectorXd evaluate(const RowVectorXd& input_vector){
 		RowVectorXd temp = input_vector;
 		int i = 0;
 		for(MatrixXd l : layers){
@@ -260,7 +260,7 @@ public:
 				//for(int g = 0; g  < BATCH_SIZE; g++){
 				example_num = order[k];
 				pair<RowVectorXd,RowVectorXd> example = generate_training_example(images, labels);
-				RowVectorXd result = evaluate(example.first, example.second);
+				RowVectorXd result = evaluate(example.first);
 				prev_loss = loss_ex;
 				loss_ex = loss(result, example.second);
 				if(example_num % 10000 == 0){
@@ -309,7 +309,7 @@ public:
 	cout << "training complete!" << endl;
 	}
 //calculate outputs giving input
-	void perceptron() {
+	/*void perceptron() {
 			//set all hidden nodes to 0;
 			for(int i = 0; i < num_hidden_layers; i++) {
 				for(int j = 1; j < num_hidden_neurons+1; j++) {
@@ -351,7 +351,7 @@ public:
 				output_out[i] = output_in[i];
 			}
 
-	}
+	}*/
 	//method to test (Kevin Yan)
 	void testing(string testing_images_filename, string testing_labels_filename) {
 		ifstream testing_images(testing_images_filename);
@@ -369,9 +369,9 @@ public:
 		int num_labels = read_num(testing_labels,4);
 		char buffer;
 		char label;
-		int image_matrix[IMAGE_ROWS][IMAGE_COLS];
+		//int image_matrix[IMAGE_ROWS][IMAGE_COLS];
 		int correctCount = 0;
-
+		RowVectorXd out1(IMAGE_SIZE + 1);
 		// for(MatrixXd m : layers) {
 		// 	cout << m << endl;
 		// }
@@ -393,19 +393,20 @@ public:
 			for(int i = 0; i < IMAGE_ROWS; i++) {
 				for(int j = 0; j < IMAGE_COLS; j++) {
 					testing_images.read(&buffer, sizeof(char));
-					image_matrix[i][j] = buffer;	//might not need this line since we put it into an array and don't need the matrix really
+					//image_matrix[i][j] = buffer;	//might not need this line since we put it into an array and don't need the matrix really
 					out1[position] = buffer;
 					position++;
 				}
 			}
+			out1[0] = 1;
 
 			//get label of testing example
 			testing_labels.read( &label, sizeof(char));
 			//run inputs through nn
-			perceptron();
+			RowVectorXd output_out = evaluate(out1);
 			//get nn prediction
 			int prediction = 1;
-			for(int i = 2; i < num_output_neurons + 1; i++) {
+			for(int i = 2; i < num_output_neurons; i++) {
 				// cout << output_out[i] << endl;
 				if(output_out[i] > output_out[prediction]) {
 					prediction = i;
