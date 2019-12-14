@@ -406,7 +406,7 @@ public:
 			RowVectorXd output_out = evaluate(out1);
 			//get nn prediction
 			int prediction = 1;
-			for(int i = 2; i < num_output_neurons; i++) {
+			for(int i = 2; i < num_output_neurons + 1; i++) {
 				// cout << output_out[i] << endl;
 				if(output_out[i] > output_out[prediction]) {
 					prediction = i;
