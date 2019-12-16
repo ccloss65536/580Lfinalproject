@@ -23,7 +23,7 @@ const int IMAGE_SIZE =  IMAGE_ROWS * IMAGE_COLS; //28*28, the number of pixels i
 const int BATCH_SIZE = 60;
 
 
-//WHYYY are MNIST numbers in big endian
+//MNIST numbers in big endian
 //refactored to not require an external buffer, since that is annoying
 //Use this to read in the 4-byte numbers from MNIST files or the numbers may be backwards!!!
 int read_num(istream& in, int size){
@@ -63,18 +63,11 @@ public:
 	//output neurons;
 	double *output_out;
 	double *output_in;
-
-
-	//take training image file name
-
-	//take training labels
-
-	//num training samples
 	//num layer
 	int num_layers;
 	//num hidden layers
 	int num_hidden_layers;
-  //num input neurons
+  	//num input neurons
 	int num_input_neurons;
 	//num hidden neurons
 	int num_hidden_neurons;
@@ -91,6 +84,7 @@ public:
 	bool is_training;
 	int example_num;
 
+	//Constructor to set up neural network according to parameters
 	NeuralNetwork(double learning_rate, int num_layers, int epochs, int hidden_layer_size, double momentum, double elu_weight){
 		num_input_neurons = IMAGE_SIZE;
 		num_output_neurons = 10;
@@ -126,7 +120,8 @@ public:
 		this->epochs = epochs;
 		is_training = false;
 
-		//Allocate space for incoming and outgoing values of each neuron layer for testing (Kevin)
+		//Allocate space for incoming and outgoing values of each neuron layer for testing
+		//Trying something else for now to see if we can fix output being only 10% accuracy
 
 		/*out1 = new double[num_input_neurons + 1];
 		hidden_out = new double*[num_layers-2];	//allocate layers-2 double pointers
@@ -145,7 +140,7 @@ public:
 	}
 
 	//Image
-
+	//Generate a training example
 	pair<RowVectorXd,RowVectorXd> generate_training_example(istream& images, istream& labels){
 		uint8_t buff[IMAGE_SIZE];
 		images.seekg(example_num * IMAGE_SIZE, ios_base::cur);
@@ -172,14 +167,14 @@ public:
 	}
 
 
-	//ELU Function Kevin Yan
+	//ELU Function
 	double ELU(double x) {
 	if(x > 0)
 		return x;
 	else
 		return elu_weight*(exp(x)-1);
   }
-  //ELU derivative Function Kevin Yan
+  //ELU derivative Function
   double dELU(double x) {
     if(x > 0)
       return 1;
@@ -221,7 +216,7 @@ public:
 	//Learning
 
 
-
+	//Training function that takes reads from MNIST files and trains NN
 	void train(const string& image_file, const string& label_file){
 		vector<MatrixXd> momenta; //hold the momentum vectors for each weight column
 		for(MatrixXd l : layers){
@@ -308,7 +303,8 @@ public:
 
 	cout << "training complete!" << endl;
 	}
-//calculate outputs giving input
+	//calculate outputs giving input
+	//trying alternate function to see if we can fix the output being 10% accuracy only
 	/*void perceptron() {
 			//set all hidden nodes to 0;
 			for(int i = 0; i < num_hidden_layers; i++) {
@@ -352,7 +348,7 @@ public:
 			}
 
 	}*/
-	//method to test (Kevin Yan)
+	//method to test
 	void testing(string testing_images_filename, string testing_labels_filename) {
 		ifstream testing_images(testing_images_filename);
 		ifstream testing_labels(testing_labels_filename);
@@ -372,10 +368,6 @@ public:
 		//int image_matrix[IMAGE_ROWS][IMAGE_COLS];
 		int correctCount = 0;
 		RowVectorXd out1(IMAGE_SIZE + 1);
-		// for(MatrixXd m : layers) {
-		// 	cout << m << endl;
-		// }
-
 		//check magic numbers
 		if(image_magic_num != 2051) {
 			cerr << "Bad Testing Image Data! " << image_magic_num << endl;
@@ -412,7 +404,6 @@ public:
 					prediction = i;
 				}
 			}
-			//cout << prediction << "==" << label + 1 << endl;
 			if(prediction == label+1) {
 				correctCount++;
 			}
@@ -420,8 +411,6 @@ public:
 		cout << "Correct Count: " << correctCount << endl;
 		cout << "Total Count: " << num_images << endl;
 	}
-
-	//save weights Carl?
 };
 
 int main(int argc, char** argv){
